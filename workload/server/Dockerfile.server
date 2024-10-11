@@ -1,0 +1,10 @@
+FROM golang:1.22-bullseye 
+WORKDIR /app
+COPY . .
+RUN go mod download 
+RUN go build -o /server
+
+# default setting, TODO: build parametrise
+EXPOSE 9090 
+
+CMD /server
