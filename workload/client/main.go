@@ -30,7 +30,7 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 
 func getEnv() *Env {
 	return &Env{
-		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "cofide.mesh.global"),
+		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "http://cofide.mesh.global"),
 	}
 }
 
@@ -38,7 +38,9 @@ func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	client := &http.Client{}
+	client := &http.Client{
+		Transport: &http.Transport{},
+	}
 
 	for {
 		slog.Info("ping...")
