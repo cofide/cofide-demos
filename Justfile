@@ -1,4 +1,4 @@
 build-docker:
-	docker build -f ./workload/server/Dockerfile.server -t cofide-demo-server ./workload/server
-	docker build -f ./workload/client/Dockerfile.client -t cofide-demo-client ./workload/client
+	docker build -f ./workloads/ping-pong/server/Dockerfile.server -t cofide-demo-ping-pong-server ./workloads/ping-pong/server
+	docker build -f ./workloads/ping-pong/client/Dockerfile.client -t cofide-demo-ping-pong-client ./workloads/ping-pong/client
 
