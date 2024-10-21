@@ -3,4 +3,5 @@ WORKDIR /app
 COPY bin/ping-pong/server .
 # default setting, TODO: build parametrise
 EXPOSE 9090 
+
 CMD /app/server

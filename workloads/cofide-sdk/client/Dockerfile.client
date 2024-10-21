@@ -1,4 +1,4 @@
 FROM golang:1.22-bullseye
 WORKDIR /app
-COPY bin/ping-pong/client .
+COPY bin/cofide-sdk/client .
 CMD /app/client 
