@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"os"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -39,12 +37,12 @@ func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	router := gin.Default()
-	router.GET("/", handler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handler)
 
 	server := &http.Server{
 		Addr:              env.Port,
-		Handler:           router,
+		Handler:           mux,
 		ReadHeaderTimeout: time.Second * 10,
 	}
 
@@ -55,6 +53,7 @@ func run(ctx context.Context, env *Env) error {
 	return nil
 }
 
-func handler(c *gin.Context) {
-	c.String(http.StatusOK, "...pong")
+func handler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("...pong"))
 }
