@@ -1,6 +1,6 @@
 FROM golang:1.22-bullseye 
 WORKDIR /app
-COPY bin/ping-pong/server .
+COPY bin/cofide-sdk/server .
 # default setting, TODO: build parametrise
 EXPOSE 9090 
 
