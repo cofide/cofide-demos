@@ -44,7 +44,8 @@ func run(ctx context.Context, env *Env) error {
 	mux.HandleFunc("/", handler)
 
 	server := cofide_http_server.NewServer(&http.Server{
-		Addr: env.Port,
+		Addr:    env.Port,
+		Handler: mux,
 	},
 		cofide_http_server.WithSVIDMatch(id.Equals("bin", "client")),
 	)
