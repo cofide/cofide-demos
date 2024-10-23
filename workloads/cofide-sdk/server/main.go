@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	cofide_http_server "github.com/cofide/cofide-sdk-go/http/server"
+	"github.com/cofide/cofide-sdk-go/id"
 )
 
 func main() {
@@ -40,11 +43,11 @@ func run(ctx context.Context, env *Env) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler)
 
-	server := &http.Server{
-		Addr:              env.Port,
-		Handler:           mux,
-		ReadHeaderTimeout: time.Second * 10,
-	}
+	server := cofide_http_server.NewServer(&http.Server{
+		Addr: env.Port,
+	},
+		cofide_http_server.WithSVIDMatch(id.Equals("bin", "client")),
+	)
 
 	if err := server.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)
