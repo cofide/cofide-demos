@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net"
 	"os"
 	"time"
 
@@ -31,7 +32,7 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 
 func getEnv() *Env {
 	return &Env{
-		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "http://cofide.mesh.global"),
+		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "http://server.cofide"),
 	}
 }
 
@@ -39,7 +40,19 @@ func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	client := cofide_http.NewClient()
+	client := cofide_http.NewClient(
+		cofide_http.WithCustomResolver(
+			&net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					d := net.Dialer{
+						Timeout: time.Millisecond * time.Duration(500),
+					}
+					return d.DialContext(ctx, network, "cofide-agent.cofide.svc.cluster.local:8080")
+				},
+			},
+		),
+	)
 
 	for {
 		slog.Info("ping...")
