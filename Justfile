@@ -1,17 +1,13 @@
-build:
-	just build-ping-pong
-	just build-cofide-sdk
+build: build-ping-pong build-cofide-sdk-ping-pong build-ping-pong-mesh
 
 build-ping-pong:
-	CGO_ENABLED=0 go build -o bin/ping-pong/server ./workloads/ping-pong/server/main.go
-	CGO_ENABLED=0 go build -o bin/ping-pong/client ./workloads/ping-pong/client/main.go
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong/server
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong/client
 
-	docker build -f ./workloads/ping-pong/server/Dockerfile.server -t cofide-demo-ping-pong-server .
-	docker build -f ./workloads/ping-pong/client/Dockerfile.client -t cofide-demo-ping-pong-client .
+build-cofide-sdk-ping-pong:
+  ko build -L github.com/cofide/cofide-demos/workloads/cofide-sdk/server
+  ko build -L github.com/cofide/cofide-demos/workloads/cofide-sdk/client
 
-build-cofide-sdk:
-	CGO_ENABLED=0 go build -o bin/cofide-sdk/server ./workloads/cofide-sdk/server/main.go
-	CGO_ENABLED=0 go build -o bin/cofide-sdk/client ./workloads/cofide-sdk/client/main.go
-
-	docker build -f ./workloads/cofide-sdk/server/Dockerfile.server -t cofide-demo-cofide-sdk-server .	
-	docker build -f ./workloads/cofide-sdk/client/Dockerfile.client -t cofide-demo-cofide-sdk-client .
+build-ping-pong-mesh:
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/client

@@ -1,4 +1,0 @@
-FROM golang:1.22-bullseye
-WORKDIR /app
-COPY bin/ping-pong/client .
-CMD /app/client 

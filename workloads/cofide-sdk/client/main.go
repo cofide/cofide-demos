@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"net"
 	"os"
 	"time"
 
@@ -41,6 +40,7 @@ func run(ctx context.Context, env *Env) error {
 	defer cancel()
 
 	client := cofide_http.NewClient(
+	/*
 		cofide_http.WithCustomResolver(
 			&net.Resolver{
 				PreferGo: true,
@@ -52,6 +52,7 @@ func run(ctx context.Context, env *Env) error {
 				},
 			},
 		),
+	*/
 	)
 
 	for {

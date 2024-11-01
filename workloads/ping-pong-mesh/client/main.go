@@ -29,7 +29,9 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 }
 
 func getEnv() *Env {
-	return &Env{}
+	return &Env{
+		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "http://cofide.mesh.global"),
+	}
 }
 
 func run(ctx context.Context, env *Env) error {

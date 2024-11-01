@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ping-pong-server
+  namespace: cofide
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ping-pong-server
+      mode: legacy
+  template:
+    metadata:
+      namespace: cofide
+      labels:
+        app: ping-pong-server
+        mode: legacy
+    spec:
+      containers:
+      - name: ping-pong-server
+        image: ko://github.com/cofide/cofide-demos/ping-pong-legacy
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: tls-certs
+          mountPath: "/etc/certs"
+          readOnly: true
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: go-server-tls
