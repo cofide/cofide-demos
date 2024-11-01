@@ -39,21 +39,7 @@ func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	client := cofide_http.NewClient(
-	/*
-		cofide_http.WithCustomResolver(
-			&net.Resolver{
-				PreferGo: true,
-				Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					d := net.Dialer{
-						Timeout: time.Millisecond * time.Duration(500),
-					}
-					return d.DialContext(ctx, network, "cofide-agent.cofide.svc.cluster.local:8080")
-				},
-			},
-		),
-	*/
-	)
+	client := cofide_http.NewClient()
 
 	for {
 		slog.Info("ping...")
