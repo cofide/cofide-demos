@@ -16,7 +16,10 @@ func main() {
 }
 
 type Env struct {
-	Port string
+	Port      string
+	TLSCert   string
+	TLSKey    string
+	EnableTLS bool
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -28,8 +31,24 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 }
 
 func getEnv() *Env {
+	certPath := getEnvWithDefault("TLS_CERT_PATH", "/etc/certs/tls.crt")
+	keyPath := getEnvWithDefault("TLS_KEY_PATH", "/etc/certs/tls.key")
+
+	_, certErr := os.Stat(certPath)
+	_, keyErr := os.Stat(keyPath)
+	enableTLS := certErr == nil && keyErr == nil
+
+	if enableTLS {
+		log.Printf("TLS enabled with cert: %s, key: %s", certPath, keyPath)
+	} else {
+		log.Printf("TLS disabled: cert or key not found at %s, %s", certPath, keyPath)
+	}
+
 	return &Env{
-		Port: getEnvWithDefault("PORT", ":9090"),
+		Port:      getEnvWithDefault("PORT", ":9090"),
+		TLSCert:   certPath,
+		TLSKey:    keyPath,
+		EnableTLS: enableTLS,
 	}
 }
 
@@ -46,14 +65,23 @@ func run(ctx context.Context, env *Env) error {
 		ReadHeaderTimeout: time.Second * 10,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		return fmt.Errorf("failed to serve: %w", err)
+	if env.EnableTLS {
+		log.Printf("Starting TLS server on port %s", env.Port)
+		if err := server.ListenAndServeTLS(env.TLSCert, env.TLSKey); err != nil {
+			return fmt.Errorf("failed to serve TLS: %w", err)
+		}
+	} else {
+		log.Printf("Starting non-TLS server on port %s", env.Port)
+		if err := server.ListenAndServe(); err != nil {
+			return fmt.Errorf("failed to serve: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("...pong"))
 }
