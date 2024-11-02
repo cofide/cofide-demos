@@ -50,8 +50,6 @@ Take a look at the logs of the client pod and see the mTLS-enabled ping-pong, co
 ```
 2024/11/02 15:45:50 INFO ping from spiffe://cofide-a.test/ns/demo/sa/ping-pong-client...
 2024/11/02 15:45:50 INFO ...pong from spiffe://cofide-a.test/ns/demo/sa/ping-pong-server
-2024/11/02 15:45:55 INFO ping from spiffe://cofide-a.test/ns/demo/sa/ping-pong-client...
-2024/11/02 15:45:55 INFO ...pong from spiffe://cofide-a.test/ns/demo/sa/ping-pong-server
 ```
 
 ### Deploy an additional Cofide instance and federate the workloads
@@ -72,10 +70,15 @@ As before, we apply the configuration using the `up` command:
 $ cofide up
 ```
 
-`cofidectl` will take care of the federation itself and the exchanging of trust roots. We can now deploy ping-pong, this time using a different `Justfile` recipe:
+`cofidectl` will take care of the federation itself and initial exchange of trust roots. We can now deploy ping-pong, this time using a different `Justfile` recipe: this example will deploy the ping-pong server to `kind-user` and the client to `kind-user2`:
 
 ```
-$ just deploy-cofide-ping-pong server kind-user
-$ just deploy-cofide-ping-pong client kind-user2
+$ just deploy-cofide-ping-pong kind-user kind-user2
+```
 
 ```
+2024/11/02 23:35:18 INFO ping from spiffe://cofide-b.test/ns/demo/sa/ping-pong-client...
+2024/11/02 23:35:18 INFO ...pong from spiffe://cofide-a.test/ns/demo/sa/ping-pong-server
+```
+
+The trust zones have been successfully federated and the client and server workloads are securely communicating with mTLS 🔐.
