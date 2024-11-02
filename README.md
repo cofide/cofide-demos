@@ -4,7 +4,7 @@ This repository has an example `ping-pong` application used to demonstrate Cofid
 
 ## Quickstart
 
-### Deploy a local Cofide instance
+### Deploy a single trust zone Cofide instance
 
 To get started, spin up a local Cofide instance using a `kind` cluster. In this example, we wish to establish a trust-zone `cofide-a` with a trust domain `cofide-a.test`. Ensure your `kind` cluster is ready and specify it's name and context using the CLI flags:
 
@@ -35,7 +35,7 @@ $ cofide up
 
 You can read more details and the the various configuration options in the `cofidectl` [documentation](https://www.github.com/cofide/cofidectl/docs).
 
-### Deploy the application server and client
+#### Deploy the application server and client
 
 Now we can deploy the Go server and client and see how they seamlessly obtain a SPIFFE identity and uses it for mTLS. With the Cofide Go SDK, it's a simple drop-in complement for `net/http` and it integrates with the Cofide SPIRE instance on your behalf. You can even add simple authorization rules based on the SPIFFE ID. In these examples, the ping-pong server will only authorize requests from the ping-pong client.
 
@@ -43,7 +43,7 @@ Now we can deploy the Go server and client and see how they seamlessly obtain a 
 $ just deploy-cofide-ping-pong
 ```
 
-### Safe and secure ping-pong with Cofide
+#### Safe and secure ping-pong with Cofide
 
 Take a look at the logs of the client pod and see the mTLS-enabled ping-pong, complete with the client and server SPIFFE IDs 🔐:
 
@@ -52,7 +52,7 @@ Take a look at the logs of the client pod and see the mTLS-enabled ping-pong, co
 2024/11/02 15:45:50 INFO ...pong from spiffe://cofide-a.test/ns/demo/sa/ping-pong-server
 ```
 
-### Deploy an additional Cofide instance and federate the workloads
+### Deploy an additional Cofide trust zone instance and federate the workloads
 
 Now let's add an additional trust-zone (`cofide-b`) in a new `kind` cluster (in our case, `kind-user2`) and a Cofide federation between them:
 
