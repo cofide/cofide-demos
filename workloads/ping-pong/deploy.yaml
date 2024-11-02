@@ -29,6 +29,21 @@ spec:
           secretName: tls-secret
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: ping-pong-server
+spec:
+  selector:
+    app: ping-pong-server
+    mode: legacy
+  ports:
+    - protocol: TCP
+      port: 8443
+      targetPort: 8443
+  type: ClusterIP
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,3 +63,8 @@ spec:
       containers:
       - name: ping-pong-client
         image: ko://github.com/cofide/cofide-demos/workloads/ping-pong/client
+        env:
+        - name: PING_PONG_SERVICE_HOST
+          value: "$(PING_PONG_SERVER_SERVICE_HOST)"
+        - name: PING_PONG_SERVICE_PORT
+          value: "$(PING_PONG_SERVER_SERVICE_PORT)"

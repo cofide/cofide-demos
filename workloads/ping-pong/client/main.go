@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -19,6 +22,7 @@ func main() {
 
 type Env struct {
 	ServerAddress string
+	ServerPort    int
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -29,9 +33,24 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 	return v
 }
 
+func getEnvIntWithDefault(variable string, defaultValue int) int {
+	v, ok := os.LookupEnv(variable)
+	if !ok {
+		return defaultValue
+	}
+
+	intValue, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultValue
+	}
+
+	return intValue
+}
+
 func getEnv() *Env {
 	return &Env{
-		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "https://ping-pong-server:8443"),
+		ServerAddress: getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
+		ServerPort:    getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
 	}
 }
 
@@ -51,15 +70,19 @@ func run(ctx context.Context, env *Env) error {
 
 	for {
 		slog.Info("ping...")
-		if err := ping(client, env.ServerAddress); err != nil {
+		if err := ping(client, env.ServerAddress, env.ServerPort); err != nil {
 			slog.Error("problem reaching server", "error", err)
 		}
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func ping(client *http.Client, serverAddr string) error {
-	r, err := client.Get(serverAddr)
+func ping(client *http.Client, serverAddr string, serverPort int) error {
+	r, err := client.Get((&url.URL{
+		Scheme: "https",
+		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
+	}).String())
+
 	if err != nil {
 		return err
 	}
