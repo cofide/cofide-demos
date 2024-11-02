@@ -29,7 +29,7 @@ $ cofide up
 
 🚀
 
-Note: you can read more details and the the various configuration options in the `cofidectl` documentation.
+You can read more details and the the various configuration options in the `cofidectl` [documentation](https://www.github.com/cofide/cofidectl/docs).
 
 ### Deploy the application server and client
 
