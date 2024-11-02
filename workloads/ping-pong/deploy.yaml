@@ -18,7 +18,7 @@ spec:
       - name: ping-pong-server
         image: ko://github.com/cofide/cofide-demos/workloads/ping-pong/server
         ports:
-        - containerPort: 8080
+        - containerPort: 8443
         volumeMounts:
         - name: tls-certs
           mountPath: "/etc/certs"
@@ -27,3 +27,24 @@ spec:
       - name: tls-certs
         secret:
           secretName: tls-secret
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ping-pong-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ping-pong-client
+      mode: legacy
+  template:
+    metadata:
+      labels:
+        app: ping-pong-client
+        mode: legacy
+    spec:
+      containers:
+      - name: ping-pong-client
+        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong/client

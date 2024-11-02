@@ -81,7 +81,7 @@ build-ping-pong-mesh:
 
 deploy-ping-pong: create-secret
     # Deploy ping-pong server (legacy)
-    if ! ko resolve -f workloads/ping-pong/server/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
+    if ! ko resolve -f workloads/ping-pong/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
         echo "Error: Deployment failed" >&2; \
         exit 1; \
     fi; \

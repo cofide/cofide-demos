@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"log"
 	"log/slog"
@@ -29,15 +30,23 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 }
 
 func getEnv() *Env {
-	return &Env{}
+	return &Env{
+		ServerAddress: getEnvWithDefault("SERVER_ADDRESS", "https://ping-pong-server:8443"),
+	}
 }
 
 func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
 	client := &http.Client{
-		Transport: &http.Transport{},
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
 	}
 
 	for {

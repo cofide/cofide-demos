@@ -45,7 +45,7 @@ func getEnv() *Env {
 	}
 
 	return &Env{
-		Port:      getEnvWithDefault("PORT", ":9090"),
+		Port:      getEnvWithDefault("PORT", ":8443"),
 		TLSCert:   certPath,
 		TLSKey:    keyPath,
 		EnableTLS: enableTLS,
