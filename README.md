@@ -27,6 +27,8 @@ $ cofide up
 ✅ Configured: Post-installation configuration completed for tz on cluster kind-user
 ```
 
+🚀
+
 Note: you can read more details and the the various configuration options in the `cofidectl` documentation.
 
 ### Deploy the application server and client
@@ -39,7 +41,7 @@ $ just deploy-cofide-sdk
 
 ### Safe and secure ping-pong with Cofide
 
-Take a look at the logs of the client pod and see the mTLS-enabled ping-pong, complete with the client and server SPIFFE IDs:
+Take a look at the logs of the client pod and see the mTLS-enabled ping-pong, complete with the client and server SPIFFE IDs 🔐:
 
 ```
 2024/11/02 15:45:50 INFO ping from spiffe://foo.bar/ns/demo/sa/ping-pong-client...
