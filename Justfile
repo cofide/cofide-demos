@@ -1,3 +1,5 @@
+
+set export
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 export KO_DOCKER_REPO := env_var_or_default("KO_DOCKER_REPO", "kind.local")
@@ -38,20 +40,20 @@ generate-cert: create-cert-dir
     # Verify the certificate
     openssl x509 -in "{{cert_file}}" -text -noout > /dev/null
 
-ensure-namespace:
-    if ! kubectl get namespace "{{namespace}}" &> /dev/null; then \
+ensure-namespace context:
+    if ! kubectl --context {{context}} get namespace "{{namespace}}" &> /dev/null; then \
         echo "Namespace {{namespace}} does not exist"; \
         read -p "Create namespace? (y/n) " -r; \
         echo; \
         if [[ $REPLY =~ ^[Yy]$ ]]; then \
-            kubectl create namespace "{{namespace}}"; \
+            kubectl --context {{context}} create namespace "{{namespace}}"; \
         else \
             echo "Aborting..."; \
             exit 1; \
         fi \
     fi
 
-create-secret: ensure-namespace generate-cert
+create-secret context: (ensure-namespace context) generate-cert
     # Create the secret
     kubectl create secret tls "{{secret_name}}" \
         --key "{{key_file}}" \
@@ -61,7 +63,7 @@ create-secret: ensure-namespace generate-cert
     echo "Created Kubernetes secret {{secret_name}}"
 
 # Build all demo ping-pong applications
-build: build-ping-pong build-cofide-sdk-ping-pong build-ping-pong-mesh
+build: build-ping-pong build-cofide-ping-pong build-ping-pong-mesh
 
 # Build the legacy ping-pong applications
 build-ping-pong:
@@ -69,16 +71,16 @@ build-ping-pong:
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong/client
 
 # Build the ping-pong applications enhanced with the Cofide SDK
-build-cofide-sdk-ping-pong:
-  ko build -L github.com/cofide/cofide-demos/workloads/cofide-sdk/server
-  ko build -L github.com/cofide/cofide-demos/workloads/cofide-sdk/client
+build-cofide-ping-pong:
+  ko build -L github.com/cofide/cofide-demos/workloads/cofide/server
+  ko build -L github.com/cofide/cofide-demos/workloads/cofide/client
 
 # Build the ping-pong applications to be deployed in an Istio service mesh
 build-ping-pong-mesh:
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/client
 
-deploy-ping-pong: create-secret
+deploy-ping-pong context: (create-secret context)
     # Deploy ping-pong server (legacy)
     if ! ko resolve -f workloads/ping-pong/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
         echo "Error: Deployment failed" >&2; \
@@ -86,10 +88,24 @@ deploy-ping-pong: create-secret
     fi; \
     echo "Deployment complete"
 
-deploy-cofide-sdk: ensure-namespace
+deploy-cofide-ping-pong server_context client_context: (ensure-namespace client_context) (ensure-namespace server_context)
     # Deploy ping-pong server (cofide)
-    if ! ko resolve -f workloads/cofide-sdk/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
-        echo "Error: Deployment failed" >&2; \
+    export KIND_CLUSTER_NAME=user; \
+    if ! ko resolve -f workloads/ping-pong-cofide/server/deploy.yaml | kubectl apply --context "{{server_context}}" -n "{{namespace}}" -f -; then \
+        echo "Error: server deployment failed" >&2; \
         exit 1; \
     fi; \
-    echo "Deployment complete"
+    echo "Server deployment complete"
+
+    echo "Waiting for external IP..."; \
+    export PING_PONG_SERVER_SERVICE_HOST=$(kubectl --context {{server_context}} wait --for=jsonpath="{.status.loadBalancer.ingress[0].ip}" service/ping-pong-server -n {{namespace}} --timeout=60s > /dev/null 2>&1 \
+        && kubectl --context {{server_context}} get service ping-pong-server -n {{namespace}} -o "jsonpath={.status.loadBalancer.ingress[0].ip}"); \
+    export PING_PONG_SERVER_SERVICE_PORT=8443; \
+
+    # Deploy ping-pong client (cofide)
+    export KIND_CLUSTER_NAME=user2; \
+    if ! cat workloads/ping-pong-cofide/client/deploy.yaml | envsubst | ko resolve -f - | kubectl apply --context "{{client_context}}" -n "{{namespace}}" -f -; then \
+        echo "Error: client deployment failed" >&2; \
+        exit 1; \
+    fi; \
+    echo "Client deployment complete"
