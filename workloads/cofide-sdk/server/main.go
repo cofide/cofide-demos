@@ -32,32 +32,52 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 
 func getEnv() *Env {
 	return &Env{
-		Port: getEnvWithDefault("PORT", ":9090"),
+		Port: getEnvWithDefault("PORT", ":8443"),
 	}
 }
 
 func run(ctx context.Context, env *Env) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+	serverCtx := ctx
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler)
 
 	server := cofide_http_server.NewServer(&http.Server{
 		Addr:    env.Port,
 		Handler: mux,
-	},
-		cofide_http_server.WithSVIDMatch(id.Equals("bin", "client")),
+	}, cofide_http_server.WithSVIDMatch(id.Equals("sa", "ping-pong-client")),
 	)
 
-	if err := server.ListenAndServe(); err != nil {
-		return fmt.Errorf("failed to serve: %w", err)
+	mux.HandleFunc("/", handler(server))
+
+	go func() {
+		fmt.Println("Starting secure server on :8443")
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			fmt.Printf("server error: %v\n", err)
+		}
+	}()
+
+	<-serverCtx.Done()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("server shutdown failed: %w", err)
 	}
 
 	return nil
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("...pong"))
+func handler(server *cofide_http_server.Server) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, err := server.GetIdentity()
+		if err != nil {
+			http.Error(w, "Failed to get server identity", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fmt.Sprintf("...pong from %s", identity.ToSpiffeID().String())))
+	}
 }

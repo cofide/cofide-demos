@@ -38,22 +38,21 @@ generate-cert: create-cert-dir
     # Verify the certificate
     openssl x509 -in "{{cert_file}}" -text -noout > /dev/null
 
-create-secret: generate-cert
-    #!/usr/bin/env bash
-    # Check if the demo namespace exists
-    if ! kubectl get namespace "{{namespace}}" &> /dev/null; then
-        echo "Namespace {{namespace}} does not exist"
-        read -p "Create namespace? (y/n) " -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            kubectl create namespace "{{namespace}}"
-        else
-            echo "Aborting..."
-            exit 1
-        fi
+ensure-namespace:
+    if ! kubectl get namespace "{{namespace}}" &> /dev/null; then \
+        echo "Namespace {{namespace}} does not exist"; \
+        read -p "Create namespace? (y/n) " -r; \
+        echo; \
+        if [[ $REPLY =~ ^[Yy]$ ]]; then \
+            kubectl create namespace "{{namespace}}"; \
+        else \
+            echo "Aborting..."; \
+            exit 1; \
+        fi \
     fi
 
-     # Create the secret
+create-secret: ensure-namespace generate-cert
+    # Create the secret
     kubectl create secret tls "{{secret_name}}" \
         --key "{{key_file}}" \
         --cert "{{cert_file}}" \
@@ -82,6 +81,14 @@ build-ping-pong-mesh:
 deploy-ping-pong: create-secret
     # Deploy ping-pong server (legacy)
     if ! ko resolve -f workloads/ping-pong/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
+        echo "Error: Deployment failed" >&2; \
+        exit 1; \
+    fi; \
+    echo "Deployment complete"
+
+deploy-cofide-sdk: ensure-namespace
+    # Deploy ping-pong server (cofide)
+    if ! ko resolve -f workloads/cofide-sdk/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
         echo "Error: Deployment failed" >&2; \
         exit 1; \
     fi; \
