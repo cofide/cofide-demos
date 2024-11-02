@@ -22,7 +22,10 @@ And that's it for configuration - we're ready to spin up the stack (locally):
 
 ```
 $ cofide up
-✅ Installed: Installation completed for tz on cluster kind-user
+```
+
+```
+✅ Installed: Installation completed for cofide on cluster kind-user
 ✅ All SPIRE server pods and services are ready for tz in cluster kind-user
 ✅ Configured: Post-installation configuration completed for tz on cluster kind-user
 ```
