@@ -36,7 +36,7 @@ You can read more details and the the various configuration options in the `cofi
 
 ### Deploy the application server and client
 
-Now we can deploy the Go server and client and see how they seamlessly obtain a SPIFFE identity and uses it for mTLS. With the Cofide Go SDK, it's a simple drop-in complement for `net/http` and it integrates with the Cofide SPIRE instance on your behalf. You can even add simple authorization rules based on the SPIFFE ID.
+Now we can deploy the Go server and client and see how they seamlessly obtain a SPIFFE identity and uses it for mTLS. With the Cofide Go SDK, it's a simple drop-in complement for `net/http` and it integrates with the Cofide SPIRE instance on your behalf. You can even add simple authorization rules based on the SPIFFE ID. In these examples, the ping-pong server will only authorize requests from the ping-pong client.
 
 ```
 $ just deploy-cofide-sdk
