@@ -19,6 +19,7 @@ check-deps:
             exit 1; \
         fi \
     done
+    echo "All dependencies installed"
 
 create-cert-dir: check-deps
     # Create certificate directory if it doesn't exist
@@ -55,7 +56,7 @@ ensure-namespace context:
 
 create-secret context: (ensure-namespace context) generate-cert
     # Create the secret
-    kubectl create secret tls "{{secret_name}}" \
+    kubectl --context {{context}} create secret tls "{{secret_name}}" \
         --key "{{key_file}}" \
         --cert "{{cert_file}}" \
         -n "{{namespace}}"
@@ -82,7 +83,7 @@ build-ping-pong-mesh:
 
 deploy-ping-pong context: (create-secret context)
     # Deploy ping-pong server (legacy)
-    if ! ko resolve -f workloads/ping-pong/deploy.yaml | kubectl apply -n "{{namespace}}" -f -; then \
+    if ! ko resolve -f workloads/ping-pong/deploy.yaml | kubectl apply -n "{{namespace}}" --context {{context}} -f -; then \
         echo "Error: Deployment failed" >&2; \
         exit 1; \
     fi; \
@@ -90,7 +91,6 @@ deploy-ping-pong context: (create-secret context)
 
 deploy-cofide-ping-pong server_context client_context: (ensure-namespace client_context) (ensure-namespace server_context)
     # Deploy ping-pong server (cofide)
-    export KIND_CLUSTER_NAME=user; \
     if ! ko resolve -f workloads/ping-pong-cofide/server/deploy.yaml | kubectl apply --context "{{server_context}}" -n "{{namespace}}" -f -; then \
         echo "Error: server deployment failed" >&2; \
         exit 1; \
