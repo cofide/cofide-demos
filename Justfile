@@ -64,7 +64,7 @@ create-secret context: (ensure-namespace context) generate-cert
     echo "Created Kubernetes secret {{secret_name}}"
 
 # Build all demo ping-pong applications
-build: build-ping-pong build-cofide-ping-pong build-ping-pong-mesh
+build: build-ping-pong build-ping-pong-cofide build-ping-pong-mesh
 
 # Build the legacy ping-pong applications
 build-ping-pong:
@@ -72,9 +72,9 @@ build-ping-pong:
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong/client
 
 # Build the ping-pong applications enhanced with the Cofide SDK
-build-cofide-ping-pong:
-  ko build -L github.com/cofide/cofide-demos/workloads/cofide/server
-  ko build -L github.com/cofide/cofide-demos/workloads/cofide/client
+build-ping-pong-cofide:
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-cofide/server
+  ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-cofide/client
 
 # Build the ping-pong applications to be deployed in an Istio service mesh
 build-ping-pong-mesh:
@@ -89,7 +89,7 @@ deploy-ping-pong context: (create-secret context)
     fi; \
     echo "Deployment complete"
 
-deploy-cofide-ping-pong server_context client_context: (ensure-namespace client_context) (ensure-namespace server_context)
+deploy-ping-pong-cofide server_context client_context: (ensure-namespace client_context) (ensure-namespace server_context)
     # Deploy ping-pong server (cofide)
     if ! ko resolve -f workloads/ping-pong-cofide/server/deploy.yaml | kubectl apply --context "{{server_context}}" -n "{{namespace}}" -f -; then \
         echo "Error: server deployment failed" >&2; \
