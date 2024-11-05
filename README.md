@@ -6,9 +6,10 @@ This repository has an example `ping-pong` application used to demonstrate Cofid
 
 ### Deploy a single trust zone Cofide instance
 
-To get started, spin up a local Cofide instance using a `kind` cluster. In this example, we wish to establish a trust-zone `cofide-a` with a trust domain `cofide-a.test`. Ensure your `kind` cluster is ready and specify it's name and context using the CLI flags:
+To get started, spin up a local Cofide instance using a `kind` cluster. In this example, we wish to establish a trust-zone `cofide-a` with a trust domain `cofide-a.test`. Ensure a `kind` cluster is ready and specify it's name and context using the CLI flags:
 
 ```
+kind create cluster --name user
 cofidectl trust-zone add cofide-a --trust-domain cofide-a.test --kubernetes-cluster kind-user --profile kubernetes --kubernetes-context kind-user
 ```
 
