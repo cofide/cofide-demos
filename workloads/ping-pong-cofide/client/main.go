@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
+
+	cofide_http "github.com/cofide/cofide-sdk-go/http/client"
 )
 
 func main() {
@@ -55,34 +55,33 @@ func getEnv() *Env {
 }
 
 func run(ctx context.Context, env *Env) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
+	client := cofide_http.NewClient()
 
 	for {
-		slog.Info("ping...")
-		if err := ping(client, env.ServerAddress, env.ServerPort); err != nil {
-			slog.Error("problem reaching server", "error", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			identity, err := client.GetIdentity()
+			if err != nil {
+				slog.Error("problem obtaining client identity", "error", err)
+			}
+			slog.Info(fmt.Sprintf("ping from %s...", identity.ToSpiffeID().String()))
+			if err := ping(client, env.ServerAddress, env.ServerPort); err != nil {
+				slog.Error("problem reaching server", "error", err)
+			}
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
 	}
 }
 
-func ping(client *http.Client, serverAddr string, serverPort int) error {
-	r, err := client.Get((&url.URL{
-		Scheme: "https",
+func ping(client *cofide_http.Client, serverAddr string, serverPort int) error {
+	url := &url.URL{
+		Scheme: "http",
 		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
-	}).String())
+	}
 
+	r, err := client.Get(url.String())
 	if err != nil {
 		return err
 	}
