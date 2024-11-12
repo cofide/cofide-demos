@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,7 +9,7 @@ import (
 )
 
 func main() {
-	if err := run(context.Background(), getEnv()); err != nil {
+	if err := run(getEnv()); err != nil {
 		log.Fatal("", err)
 	}
 }
@@ -52,10 +51,7 @@ func getEnv() *Env {
 	}
 }
 
-func run(ctx context.Context, env *Env) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
+func run(env *Env) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler)
 
@@ -83,5 +79,9 @@ func run(ctx context.Context, env *Env) error {
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("...pong"))
+	_, err := w.Write([]byte("...pong"))
+	if err != nil {
+		log.Printf("Error writing response: %v", err)
+		return
+	}
 }
