@@ -4,10 +4,6 @@ go 1.22.5
 
 toolchain go1.22.8
 
-require github.com/cofide/cofide-sdk-go v0.0.0-unpublished
-
-replace github.com/cofide/cofide-sdk-go v0.0.0-unpublished => ../cofide-sdk-go
-
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect

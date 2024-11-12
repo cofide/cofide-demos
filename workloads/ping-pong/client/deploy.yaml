@@ -26,7 +26,7 @@ spec:
       serviceAccountName: ping-pong-client
       containers:
       - name: ping-pong-client
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-cofide/client
+        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong/client
         env:
         - name: PING_PONG_SERVICE_HOST
           value: "${PING_PONG_SERVER_SERVICE_HOST}"
