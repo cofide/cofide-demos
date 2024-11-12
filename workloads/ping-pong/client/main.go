@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +11,9 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/workloadapi"
 )
 
 func main() {
@@ -21,8 +23,9 @@ func main() {
 }
 
 type Env struct {
-	ServerAddress string
-	ServerPort    int
+	ServerAddress    string
+	ServerPort       int
+	SpiffeSocketPath string
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -49,8 +52,9 @@ func getEnvIntWithDefault(variable string, defaultValue int) int {
 
 func getEnv() *Env {
 	return &Env{
-		ServerAddress: getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
-		ServerPort:    getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
+		ServerAddress:    getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
+		ServerPort:       getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
+		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
 	}
 }
 
@@ -58,10 +62,13 @@ func run(ctx context.Context, env *Env) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
+	source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
+	if err != nil {
+		return fmt.Errorf("unable to obtain SVID: %w", err)
 	}
+	defer source.Close()
 
+	tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny())
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
