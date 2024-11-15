@@ -4,6 +4,11 @@ This repository has example applications that are used to demonstrate Cofide's o
 
 The examples include `ping-pong` that can be deployed in a single Cofide trust zone, or federated across trust zones with multiple clusters.
 
+There are two flavours of `ping-pong`:
+
+- `workloads/ping-pong`: SPIFFE mTLS-enabled HTTPS ping pong
+- `workloads/ping-pong-mesh`: HTTP ping pong for use with a service mesh
+
 ## Deploy a single trust zone Cofide instance
 
 See the [`cofidectl` docs](https://www.github.com/cofide/cofidectl/README.md#quickstart)
