@@ -15,7 +15,7 @@ import (
 
 func main() {
 	if err := run(context.Background(), getEnv()); err != nil {
-		log.Fatal("", err)
+		log.Fatal(err)
 	}
 }
 
