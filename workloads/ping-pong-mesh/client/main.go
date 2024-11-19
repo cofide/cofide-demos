@@ -11,9 +11,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
-	"github.com/spiffe/go-spiffe/v2/workloadapi"
 )
 
 func main() {
@@ -25,13 +22,12 @@ func main() {
 type Env struct {
 	ServerAddress    string
 	ServerPort       int
-	SpiffeSocketPath string
 }
 
-func getEnvWithDefault(variable string, defaultValue string) string {
+func getEnvOrPanic(variable string) string {
 	v, ok := os.LookupEnv(variable)
 	if !ok {
-		return defaultValue
+		panic(fmt.Sprintf("expected environment variable %s not set", variable))
 	}
 	return v
 }
@@ -52,27 +48,14 @@ func getEnvIntWithDefault(variable string, defaultValue int) int {
 
 func getEnv() *Env {
 	return &Env{
-		ServerAddress:    getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
-		ServerPort:       getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
-		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
+		ServerAddress:    getEnvOrPanic("PING_PONG_SERVICE_HOST"),
+		ServerPort:       getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 80),
 	}
 }
 
 func run(ctx context.Context, env *Env) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
-	if err != nil {
-		return fmt.Errorf("unable to obtain SVID: %w", err)
-	}
-	defer source.Close()
-
-	tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeAny())
 	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
+		Transport: &http.Transport{},
 	}
 
 	for {
@@ -86,7 +69,7 @@ func run(ctx context.Context, env *Env) error {
 
 func ping(client *http.Client, serverAddr string, serverPort int) error {
 	r, err := client.Get((&url.URL{
-		Scheme: "https",
+		Scheme: "http",
 		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
 	}).String())
 
