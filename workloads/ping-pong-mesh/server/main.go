@@ -29,7 +29,7 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 
 func getEnv() *Env {
 	return &Env{
-		Port: getEnvWithDefault("PORT", ":9090"),
+		Port: getEnvWithDefault("PORT", ":8443"),
 	}
 }
 
