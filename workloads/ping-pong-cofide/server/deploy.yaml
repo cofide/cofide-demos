@@ -56,7 +56,7 @@ spec:
       port: 8443
       targetPort: 8443
       name: https-passthrough
-    - protocol: HTTP
+    - protocol: TCP
       port: 8080
       targetPort: 8080
       name: http
