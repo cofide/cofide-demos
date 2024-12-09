@@ -19,7 +19,8 @@ func main() {
 }
 
 type Env struct {
-	Port string
+	SecurePort   string
+	InsecurePort string
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -32,27 +33,44 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 
 func getEnv() *Env {
 	return &Env{
-		Port: getEnvWithDefault("PORT", ":8443"),
+		SecurePort:   getEnvWithDefault("SECURE_PORT", ":8443"),
+		InsecurePort: getEnvWithDefault("INSECURE_PORT", ":8080"),
 	}
 }
 
 func run(ctx context.Context, env *Env) error {
 	serverCtx := ctx
 
-	mux := http.NewServeMux()
-
-	server := cofide_http_server.NewServer(&http.Server{
-		Addr:    env.Port,
-		Handler: mux,
+	secureMux := http.NewServeMux()
+	secureServer := cofide_http_server.NewServer(&http.Server{
+		Addr:    env.SecurePort,
+		Handler: secureMux,
 	}, cofide_http_server.WithSVIDMatch(id.Equals("sa", "ping-pong-client")),
 	)
+	secureMux.HandleFunc("/", handler(secureServer))
 
-	mux.HandleFunc("/", handler(server))
+	insecureMux := http.NewServeMux()
+	insecureServer := &http.Server{
+		Addr:    env.InsecurePort,
+		Handler: insecureMux,
+	}
+	insecureMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("...pong from insecure server"))
+	})
 
 	go func() {
-		fmt.Println("Starting secure server on :8443")
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			fmt.Printf("server error: %v\n", err)
+		fmt.Printf("Starting secure server on %s\n", env.SecurePort)
+		if err := secureServer.ListenAndServe(); err != http.ErrServerClosed {
+			fmt.Printf("secure server error: %v\n", err)
+		}
+	}()
+
+	go func() {
+		fmt.Printf("Starting insecure server on %s\n", env.InsecurePort)
+		if err := insecureServer.ListenAndServe(); err != http.ErrServerClosed {
+			fmt.Printf("insecure server error: %v\n", err)
 		}
 	}()
 
