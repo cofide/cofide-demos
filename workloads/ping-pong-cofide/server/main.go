@@ -79,8 +79,12 @@ func run(ctx context.Context, env *Env) error {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("server shutdown failed: %w", err)
+	if err := secureServer.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("secure server shutdown failed: %w", err)
+	}
+
+	if err := insecureServer.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("insecure server shutdown failed: %w", err)
 	}
 
 	return nil
