@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -29,20 +28,6 @@ func getEnvOrPanic(variable string) string {
 		panic(fmt.Sprintf("expected environment variable %s not set", variable))
 	}
 	return v
-}
-
-func getEnvIntWithDefault(variable string, defaultValue int) int {
-	v, ok := os.LookupEnv(variable)
-	if !ok {
-		return defaultValue
-	}
-
-	intValue, err := strconv.Atoi(v)
-	if err != nil {
-		return defaultValue
-	}
-
-	return intValue
 }
 
 func getEnv() *Env {
