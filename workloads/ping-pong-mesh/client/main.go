@@ -20,8 +20,7 @@ func main() {
 }
 
 type Env struct {
-	ServerAddress    string
-	ServerPort       int
+	ServerAddress string
 }
 
 func getEnvOrPanic(variable string) string {
@@ -48,8 +47,7 @@ func getEnvIntWithDefault(variable string, defaultValue int) int {
 
 func getEnv() *Env {
 	return &Env{
-		ServerAddress:    getEnvOrPanic("PING_PONG_SERVICE_HOST"),
-		ServerPort:       getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 80),
+		ServerAddress: getEnvOrPanic("PING_PONG_SERVICE_HOST"),
 	}
 }
 
@@ -60,17 +58,17 @@ func run(ctx context.Context, env *Env) error {
 
 	for {
 		slog.Info("ping...")
-		if err := ping(client, env.ServerAddress, env.ServerPort); err != nil {
+		if err := ping(client, env.ServerAddress); err != nil {
 			slog.Error("problem reaching server", "error", err)
 		}
 		time.Sleep(5 * time.Second)
 	}
 }
 
-func ping(client *http.Client, serverAddr string, serverPort int) error {
+func ping(client *http.Client, serverAddr string) error {
 	r, err := client.Get((&url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
+		Host:   fmt.Sprintf("%s", serverAddr),
 	}).String())
 
 	if err != nil {
