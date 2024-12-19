@@ -68,7 +68,7 @@ func run(ctx context.Context, env *Env) error {
 func ping(client *http.Client, serverAddr string) error {
 	r, err := client.Get((&url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s", serverAddr),
+		Host:   serverAddr,
 	}).String())
 
 	if err != nil {
