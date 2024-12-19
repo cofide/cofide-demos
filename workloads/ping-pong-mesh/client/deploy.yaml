@@ -22,6 +22,14 @@ spec:
       labels:
         app: ping-pong-client
         mode: cofide
+        spiffe.io/spire-managed-identity: "true"
+        sidecar.istio.io/inject: "true"
+      annotations:
+        proxy.istio.io/config: |
+          proxyMetadata:
+            ISTIO_META_DNS_CAPTURE: "true"
+            ISTIO_META_DNS_AUTO_ALLOCATE: "true"
+        inject.istio.io/templates: "sidecar,spire"
     spec:
       serviceAccountName: ping-pong-client
       containers:
