@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    name: production
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      serviceAccountName: default
+      containers:
+        - name: consumer-container
+          image: cofide/demo/consumer:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: spiffe-workload-api
+              mountPath: /spiffe-workload-api
+              readOnly: true
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          env:
+          - name: SPIFFE_ENDPOINT_SOCKET
+            value: unix:///spiffe-workload-api/spire-agent.sock
+          - name: TRUST_DOMAIN
+            value: ${TRUST_DOMAIN}
+          - name: AWS_ROLE_ARN
+            value: ${CONSUMER_AWS_ROLE_ARN}
+      volumes:
+        - name: spiffe-workload-api
+          csi:
+            driver: "csi.spiffe.io"
+            readOnly: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consumer
+  namespace: production
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: http
+  selector:
+    app: consumer
