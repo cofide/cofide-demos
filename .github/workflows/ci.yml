@@ -20,8 +20,10 @@ jobs:
         workload:
         - path: aws/consumer
           repo: aws-consumer-demo
+          specs: true
         - path: aws/analysis
           repo: aws-analysis-demo
+          specs: true
         - path: ping-pong/client
           repo: ping-pong-client-demo
           specs: true
