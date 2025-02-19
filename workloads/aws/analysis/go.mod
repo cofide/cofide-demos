@@ -1,4 +1,4 @@
-module github.com/cofide/analysis
+module github.com/cofide/workloads/aws/analysis
 
 go 1.22.2
 
