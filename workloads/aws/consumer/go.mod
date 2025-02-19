@@ -1,4 +1,4 @@
-module github.com/cofide/consumer
+module github.com/cofide/workloads/aws/consumer
 
 go 1.22.2
 
