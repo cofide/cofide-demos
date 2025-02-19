@@ -1,150 +1,41 @@
-name: build-and-push-images
+name: ci
 on:
-    push:
-      tags:
-        - "v*.*.*"
-    # temporary - for testing
-    pull_request:
-permissions:
-  contents: read
-  id-token: write
+  push:
+    branches:
+      - main
+  pull_request:
+
 jobs:
-  build:
-    strategy:
-      matrix:
-        platforms:
-        - platform: linux/amd64
-          runs-on: ubuntu-latest
-        - platform: linux/arm64
-          runs-on: connect-ci-runner-arm
-        workload:
-        - path: aws/consumer
-          repo: aws-consumer-demo
-        - path: aws/analysis
-          repo: aws-analysis-demo
-        - path: ping-pong/client
-          repo: ping-pong-client-demo
-          specs: true
-        - path: ping-pong/server
-          repo: ping-pong-server-demo
-          specs: true
-        - path: ping-pong-mesh/client
-          repo: ping-pong-mesh-client-demo
-          specs: true
-        - path: ping-pong-mesh/server
-          repo: ping-pong-mesh-server-demo
-          specs: true
-    runs-on: ${{ matrix.platforms.runs-on }}
-
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
     steps:
-      - name: Prepare
-        run: |
-          platform=${{ matrix.platforms.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
-      - name: Set image name
-        run: echo "IMAGE_NAME=${{vars.AWS_ACCOUNT_ID}}.dkr.ecr.${{vars.AWS_REGION}}.amazonaws.com/cofide/${{ matrix.workload.repo }}" >> $GITHUB_ENV
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.IMAGE_NAME }}
-
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Oras
-        uses: oras-project/setup-oras@v1
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          role-to-assume: ${{vars.ECR_WRITE_ROLE}}
-          role-session-name: connect-ecr-gh-actions-access
-          aws-region: ${{ vars.AWS_REGION }}    
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push
-        id: push
-        uses: docker/build-push-action@v6
+          go-version-file: go.mod
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          context: workloads/${{ matrix.workload.path }}
-          file: workloads/${{ matrix.workload.path }}/Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: ${{ matrix.platforms.platform }}
-          labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,"name=${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
-  
-      - name: Attach k8s specs
-        if : ${{ matrix.workload.specs }}
-        run: oras attach --artifact-type application/vnd.kubernetes.specs --annotation "org.opencontainers.image.title=K8s Specs" ${{env.IMAGE_NAME}}@${{ steps.push.outputs.digest }} workloads/${{ matrix.workload.path }}/deploy.yaml
-      - name: Export digest
-        run: |
-          mkdir -p ${{ runner.temp }}/digests/${{ matrix.workload.repo}}
-          digest="${{ steps.push.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${{ matrix.workload.repo}}/${digest#sha256:}"
-  
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ matrix.workload.repo}}-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/digests/${{ matrix.workload.repo}}/*
-          if-no-files-found: error
-          retention-days: 1
-  merge:
+          args: --timeout=5m
+
+  build-test:
+    name: build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        repo:
-          - aws-consumer-demo
-          - aws-analysis-demo
-          - ping-pong-client-demo
-          - ping-pong-server-demo
-          - ping-pong-mesh-client-demo
-          - ping-pong-mesh-server-demo
-    needs:
-      - build
     steps:
-      - name: Download digests
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          path: ${{ runner.temp }}/digests/${{ matrix.repo}}/
-          pattern: digests-${{ matrix.repo}}-*
-          merge-multiple: true
-
-      - name: Setup Oras
-        uses: oras-project/setup-oras@v1
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{vars.ECR_WRITE_ROLE}}
-          role-session-name: connect-ecr-gh-actions-access
-          aws-region: ${{ vars.AWS_REGION }}    
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Set image name
-        run: echo "IMAGE_NAME=${{vars.AWS_ACCOUNT_ID}}.dkr.ecr.${{vars.AWS_REGION}}.amazonaws.com/cofide/${{ matrix.repo }}" >> $GITHUB_ENV
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Create manifest list and push
-        working-directory: ${{ runner.temp }}/digests/${{ matrix.repo}}
-        run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
-
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          go-version-file: go.mod
+      - name: Setup Ko
+        uses: ko-build/setup-ko@v0.6
+        env:
+          KO_DOCKER_REPO: ko.local
+      - name: Build all demos
+        run: just build-demos
