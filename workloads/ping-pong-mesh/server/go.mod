@@ -1,4 +1,4 @@
-module github.com/cofide/cofide-demos/workloads/ping-pong-mesh/client
+module github.com/cofide/cofide-demos
 
 go 1.22.11
 
