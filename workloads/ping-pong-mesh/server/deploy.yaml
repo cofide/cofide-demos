@@ -35,7 +35,7 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
+        image: ${SERVER_IMAGE}
         ports:
         - containerPort: 8443
 ---
