@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ping-pong-server
+  namespace: "${NAMESPACE}"
   labels:
     app: ping-pong-server
     mode: cofide
@@ -11,6 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ping-pong-server
+  namespace: "${NAMESPACE}"
 spec:
   replicas: 1
   selector:
@@ -42,6 +44,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ping-pong-server
+  namespace: "${NAMESPACE}"
 spec:
   selector:
     app: ping-pong-server
