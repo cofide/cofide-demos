@@ -32,6 +32,8 @@ spec:
           value: "${PING_PONG_SERVER_SERVICE_HOST}"
         - name: PING_PONG_SERVICE_PORT
           value: "${PING_PONG_SERVER_SERVICE_PORT}"
+        - name: EXPERIMENTAL_XDS_SERVER_URI
+          value: "${EXPERIMENTAL_XDS_SERVER_URI}"
         - name: SPIFFE_ENDPOINT_SOCKET
           value: unix:///spiffe-workload-api/spire-agent.sock
         volumeMounts:
