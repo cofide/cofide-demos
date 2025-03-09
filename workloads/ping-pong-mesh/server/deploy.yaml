@@ -35,7 +35,8 @@ spec:
       - name: ping-pong-server
         image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
         env:
-          PORT: "${PORT}"
+        - name: PORT
+          value: "${PORT}"
         ports:
         - containerPort: "${PORT}"
 ---
