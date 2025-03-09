@@ -36,9 +36,9 @@ spec:
         image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
         env:
         - name: PORT
-          value: "${PORT}"
+          value: ":${PORT}"
         ports:
-        - containerPort: "${PORT}"
+        - containerPort: ${PORT}
 ---
 
 apiVersion: v1
@@ -51,6 +51,6 @@ spec:
     mode: cofide
   ports:
     - protocol: TCP
-      port: "${PORT}"
-      targetPort: "${PORT}"
+      port: ${PORT}
+      targetPort: ${PORT}
   type: LoadBalancer
