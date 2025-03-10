@@ -19,7 +19,7 @@ check-deps:
     echo "All dependencies installed"
 
 # Build all demo ping-pong applications
-build-demos: build-ping-pong build-ping-pong-mesh
+build-demos: build-ping-pong build-ping-pong-mesh build-aws-oidc
 
 # Build the ping-pong application
 build-ping-pong:
@@ -30,3 +30,7 @@ build-ping-pong:
 build-ping-pong-mesh:
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
   ko build -L github.com/cofide/cofide-demos/workloads/ping-pong-mesh/client
+
+build-aws-oidc:
+  ko build -L github.com/cofide/cofide-demos/workloads/aws-oidc/consumer
+  ko build -L github.com/cofide/cofide-demos/workloads/aws-oidc/analysis

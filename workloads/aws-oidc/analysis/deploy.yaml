@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: analytics
+  labels:
+    name: analytics
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analysis
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analysis
+  template:
+    metadata:
+      labels:
+        app: analysis
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      serviceAccountName: default
+      containers:
+        - name: analysis-container
+          image: cofide/demo/analysis:latest
+          imagePullPolicy: Never
+          volumeMounts:
+            - name: spiffe-workload-api
+              mountPath: /spiffe-workload-api
+              readOnly: true
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          env:
+          - name: SPIFFE_ENDPOINT_SOCKET
+            value: unix:///spiffe-workload-api/spire-agent.sock
+          - name: CONSUMER_TRUST_DOMAIN
+            value: ${CONSUMER_TRUST_DOMAIN}
+          - name: CONSUMER_SERVER_ADDRESS
+            value: ${CONSUMER_SERVER_ADDRESS}
+      volumes:
+      - name: spiffe-workload-api
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true
