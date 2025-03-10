@@ -37,7 +37,5 @@ jobs:
           go-version-file: go.mod
       - name: Setup Ko
         uses: ko-build/setup-ko@v0.6
-        env:
-          KO_DOCKER_REPO: ghcr.io/cofide/cofide-demos
       - name: Build all demos
         run: just build-demos
