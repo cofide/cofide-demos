@@ -22,7 +22,6 @@ jobs:
       - name: Setup KO
         uses: ko-build/setup-ko@v0.6
       - name: Set KO_TAG to version
-        if: github.event_name == 'release'
         run: |
           tag=${GITHUB_REF#refs/*/}
           echo "KO_TAG=$(echo $tag)" >> $GITHUB_ENV
