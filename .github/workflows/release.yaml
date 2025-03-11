@@ -1,12 +1,8 @@
 name: release
 on:
   push:
-    branches:
-      - main
-  release:
-    types:
-      - published
-    
+    tags:
+      - 'v*.*.*'
 jobs:
   build-release:
     name: build-release
