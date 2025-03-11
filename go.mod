@@ -1,7 +1,8 @@
 module github.com/cofide/cofide-demos
 
-go 1.22.5
-toolchain go1.23.6
+go 1.22.11
+
+toolchain go1.24.1
 
 require github.com/spiffe/go-spiffe/v2 v2.5.0
 
