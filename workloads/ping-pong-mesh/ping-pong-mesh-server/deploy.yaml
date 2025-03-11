@@ -33,7 +33,8 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
+        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-server:latest
+        imagePullPolicy: Always
         env:
         - name: PORT
           value: ":${PING_PONG_SERVER_SERVICE_PORT}"

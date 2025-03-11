@@ -28,8 +28,8 @@ spec:
       serviceAccountName: default
       containers:
         - name: consumer-container
-          image: cofide/demo/consumer:latest
-          imagePullPolicy: Never
+          image: ghcr.io/cofide/cofide-demos/aws-oidc-consumer:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 9090
           volumeMounts:
