@@ -21,9 +21,9 @@ jobs:
           go-version-file: go.mod
       - name: Setup KO
         uses: ko-build/setup-ko@v0.6
-      - name: Set KO_TAG to version
+      - name: Build all demos
         run: |
           tag=${GITHUB_REF#refs/*/}
-          echo "KO_TAG=$(echo $tag)" >> $GITHUB_ENV
-      - name: Build all demos
-        run: just build-demos
+          echo $tag
+          export RELEASE_TAG=$tag
+          just build-demos
