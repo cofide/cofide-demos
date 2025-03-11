@@ -34,7 +34,7 @@ spec:
       serviceAccountName: ping-pong-client
       containers:
       - name: ping-pong-client
-        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-client:latest
+        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-client:${IMAGE_TAG}
         imagePullPolicy: Always
         env:
         - name: PING_PONG_SERVICE_HOST

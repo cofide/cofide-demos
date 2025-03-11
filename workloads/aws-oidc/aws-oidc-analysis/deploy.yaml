@@ -28,7 +28,7 @@ spec:
       serviceAccountName: default
       containers:
         - name: analysis-container
-          image: ghcr.io/cofide/cofide-demos/aws-oidc-analysis:latest
+          image: ghcr.io/cofide/cofide-demos/aws-oidc-analysis:${IMAGE_TAG}
           imagePullPolicy: Always
           volumeMounts:
             - name: spiffe-workload-api
