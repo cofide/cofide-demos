@@ -34,8 +34,11 @@ spec:
       containers:
       - name: ping-pong-server
         image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
+        env:
+        - name: PORT
+          value: ":${PING_PONG_SERVER_SERVICE_PORT}"
         ports:
-        - containerPort: 8443
+        - containerPort: ${PING_PONG_SERVER_SERVICE_PORT}
 ---
 
 apiVersion: v1
@@ -48,6 +51,6 @@ spec:
     mode: cofide
   ports:
     - protocol: TCP
-      port: 8443
-      targetPort: 8443
+      port: ${PING_PONG_SERVER_SERVICE_PORT}
+      targetPort: ${PING_PONG_SERVER_SERVICE_PORT}
   type: LoadBalancer
