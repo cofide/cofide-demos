@@ -1,0 +1,32 @@
+name: release
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+    
+jobs:
+  build-release:
+    name: build-release
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Setup KO
+        uses: ko-build/setup-ko@v0.6
+      - name: Set KO_TAG to version
+        if: github.event_name == 'release'
+        run: echo "KO_TAG=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Build all demos
+        run: just build-demos

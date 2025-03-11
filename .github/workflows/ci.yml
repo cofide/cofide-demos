@@ -24,8 +24,6 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,5 +35,9 @@ jobs:
           go-version-file: go.mod
       - name: Setup Ko
         uses: ko-build/setup-ko@v0.6
+        env:
+          # Verify build with ephemeral ko registry
+          # We only push to gchr on release
+          KO_DOCKER_REPO: ko.local
       - name: Build all demos
         run: just build-demos
