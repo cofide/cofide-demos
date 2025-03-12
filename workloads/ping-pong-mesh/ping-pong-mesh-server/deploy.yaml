@@ -39,9 +39,6 @@ spec:
           requests:
             memory: "128Mi"
             cpu: "200m"
-          limits:
-            memory: "256Mi"
-            cpu: "300m"
         env:
         - name: PORT
           value: ":${PING_PONG_SERVER_SERVICE_PORT}"

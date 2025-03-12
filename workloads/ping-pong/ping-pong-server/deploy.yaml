@@ -32,9 +32,6 @@ spec:
           requests:
             memory: "128Mi"
             cpu: "200m"
-          limits:
-            memory: "256Mi"
-            cpu: "300m"
         ports:
         - containerPort: 8443
         volumeMounts:
