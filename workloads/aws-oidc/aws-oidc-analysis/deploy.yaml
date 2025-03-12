@@ -30,6 +30,10 @@ spec:
         - name: analysis-container
           image: ghcr.io/cofide/cofide-demos/aws-oidc-analysis:${IMAGE_TAG}
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "200m"
           volumeMounts:
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api

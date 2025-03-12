@@ -30,6 +30,10 @@ spec:
         - name: consumer-container
           image: ghcr.io/cofide/cofide-demos/aws-oidc-consumer:${IMAGE_TAG}
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "200m"
           ports:
             - containerPort: 9090
           volumeMounts:
