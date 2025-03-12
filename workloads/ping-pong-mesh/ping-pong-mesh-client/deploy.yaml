@@ -34,7 +34,12 @@ spec:
       serviceAccountName: ping-pong-client
       containers:
       - name: ping-pong-client
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/client
+        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-client:${IMAGE_TAG}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "200m"
         env:
         - name: PING_PONG_SERVICE_HOST
           value: "${PING_PONG_SERVER_SERVICE_HOST}"
