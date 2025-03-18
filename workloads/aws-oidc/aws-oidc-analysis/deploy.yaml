@@ -33,7 +33,7 @@ spec:
           resources:
             requests:
               memory: "128Mi"
-              cpu: "200m"
+              cpu: "100m"
           volumeMounts:
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api
