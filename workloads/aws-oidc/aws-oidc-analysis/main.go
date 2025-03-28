@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -26,25 +28,30 @@ func run(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(socketPath)))
-	if err != nil {
-		return fmt.Errorf("unable to create X509Source: %w", err)
-	}
-	defer source.Close()
+	var tlsConfig *tls.Config
+	enableTLS := strings.ToLower(os.Getenv("ENABLE_TLS")) == "true"
+	if enableTLS {
+		source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(socketPath)))
+		if err != nil {
+			return fmt.Errorf("unable to create X509Source: %w", err)
+		}
+		defer source.Close()
 
-	serverAddress := os.Getenv("CONSUMER_SERVER_ADDRESS")
-	spiffeID := fmt.Sprintf(
-		"spiffe://%s/ns/production/sa/default",
-		os.Getenv("CONSUMER_TRUST_DOMAIN"),
-	)
-	allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
-	tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeID(allowedSPIFFEID))
+		spiffeID := fmt.Sprintf(
+			"spiffe://%s/ns/production/sa/default",
+			os.Getenv("CONSUMER_TRUST_DOMAIN"),
+		)
+		allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
+		tlsConfig = tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeID(allowedSPIFFEID))
+	}
+
 	client := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},
 	}
 
+	serverAddress := os.Getenv("CONSUMER_SERVER_ADDRESS")
 	for {
 		err := getBuckets(client, serverAddress)
 		if err != nil {

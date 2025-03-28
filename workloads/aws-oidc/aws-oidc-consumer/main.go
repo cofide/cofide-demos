@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +18,6 @@ import (
 )
 
 const (
-	address     = "0.0.0.0:9090"
 	audience    = "consumer-workload"
 	sessionName = "consumer-workload-session"
 	socketPath  = "unix:///spiffe-workload-api/spire-agent.sock"
@@ -36,25 +37,30 @@ func run(ctx context.Context) error {
 	router.GET("/", getRoot)
 	router.GET("/buckets", getBuckets)
 
-	source, err := workloadapi.NewX509Source(
-		ctx,
-		workloadapi.WithClientOptions(
-			workloadapi.WithAddr(socketPath),
-			workloadapi.WithLogger(logger.Std),
-		),
-	)
+	var tlsConfig *tls.Config
+	enableTLS := strings.ToLower(os.Getenv("ENABLE_TLS")) == "true"
+	if enableTLS {
+		source, err := workloadapi.NewX509Source(
+			ctx,
+			workloadapi.WithClientOptions(
+				workloadapi.WithAddr(socketPath),
+				workloadapi.WithLogger(logger.Std),
+			),
+		)
 
-	if err != nil {
-		return fmt.Errorf("unable to create X509Source: %w", err)
+		if err != nil {
+			return fmt.Errorf("unable to create X509Source: %w", err)
+		}
+		defer source.Close()
+
+		spiffeID := fmt.Sprintf(
+			"spiffe://%s/ns/analytics/sa/default",
+			os.Getenv("ANALYSIS_TRUST_DOMAIN"),
+		)
+		allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
+		tlsConfig = tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeID(allowedSPIFFEID))
 	}
-	defer source.Close()
 
-	spiffeID := fmt.Sprintf(
-		"spiffe://%s/ns/analytics/sa/default",
-		os.Getenv("ANALYSIS_TRUST_DOMAIN"),
-	)
-	allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
-	tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeID(allowedSPIFFEID))
 	server := &http.Server{
 		Addr:              ":9090",
 		Handler:           router,
@@ -62,8 +68,14 @@ func run(ctx context.Context) error {
 		ReadHeaderTimeout: time.Second * 10,
 	}
 
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		return fmt.Errorf("failed to serve: %w", err)
+	if enableTLS {
+		if err := server.ListenAndServeTLS("", ""); err != nil {
+			return fmt.Errorf("failed to serve: %w", err)
+		}
+	} else {
+		if err := server.ListenAndServe(); err != nil {
+			return fmt.Errorf("failed to serve: %w", err)
+		}
 	}
 	return nil
 }
