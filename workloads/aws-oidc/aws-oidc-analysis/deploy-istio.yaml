@@ -20,6 +20,14 @@ spec:
     metadata:
       labels:
         app: analysis
+        spiffe.io/spire-managed-identity: "true"
+        sidecar.istio.io/inject: "true"
+      annotations:
+        proxy.istio.io/config: |
+          proxyMetadata:
+            ISTIO_META_DNS_CAPTURE: "true"
+            ISTIO_META_DNS_AUTO_ALLOCATE: "true"
+        inject.istio.io/templates: "sidecar,spire"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -34,21 +42,8 @@ spec:
             requests:
               memory: "128Mi"
               cpu: "100m"
-          volumeMounts:
-            - name: spiffe-workload-api
-              mountPath: /spiffe-workload-api
-              readOnly: true
           env:
-          - name: SPIFFE_ENDPOINT_SOCKET
-            value: unix:///spiffe-workload-api/spire-agent.sock
-          - name: CONSUMER_TRUST_DOMAIN
-            value: ${CONSUMER_TRUST_DOMAIN}
           - name: CONSUMER_SERVER_ADDRESS
             value: ${CONSUMER_SERVER_ADDRESS}
           - name: ENABLE_TLS
-            value: "true"
-      volumes:
-      - name: spiffe-workload-api
-        csi:
-          driver: "csi.spiffe.io"
-          readOnly: true
+            value: "false"
