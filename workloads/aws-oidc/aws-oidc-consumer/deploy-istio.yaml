@@ -54,6 +54,9 @@ spec:
             value: ${CONSUMER_AWS_ROLE_ARN}
           - name: ENABLE_TLS
             value: "false"
+          - name: ANALYSIS_SPIFFE_ID
+            value: ${ANALYSIS_SPIFFE_ID}
+
       volumes:
         - name: spiffe-workload-api
           csi:

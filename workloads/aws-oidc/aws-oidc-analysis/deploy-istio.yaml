@@ -47,3 +47,5 @@ spec:
             value: ${CONSUMER_SERVER_ADDRESS}
           - name: ENABLE_TLS
             value: "false"
+          - name: CONSUMER_SPIFFE_ID
+            value: ${CONSUMER_SPIFFE_ID}
