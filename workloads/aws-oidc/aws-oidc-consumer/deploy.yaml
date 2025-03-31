@@ -47,6 +47,8 @@ spec:
             value: ${ANALYSIS_TRUST_DOMAIN}
           - name: AWS_ROLE_ARN
             value: ${CONSUMER_AWS_ROLE_ARN}
+          - name: ANALYSIS_SPIFFE_ID
+            value: ${ANALYSIS_SPIFFE_ID}
           - name: ENABLE_TLS
             value: "true"
       volumes:
