@@ -40,7 +40,7 @@ func run(ctx context.Context) error {
 		var consumerSPIFFEID string
 		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFE_ID")
 		if !ok {
-			// Default expected SPIFFEID for consumer workload
+			// Default expected SPIFFE ID for consumer workload
 			consumerSPIFFEID = "spiffe://%s/ns/production/sa/default"
 		}
 
