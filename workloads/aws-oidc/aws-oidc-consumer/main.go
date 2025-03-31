@@ -54,7 +54,7 @@ func run(ctx context.Context) error {
 		defer source.Close()
 
 		var analysisSPIFFEID string
-		analysisSPIFFEID, ok := os.LookupEnv("ANALYSIS_SPIFFEID")
+		analysisSPIFFEID, ok := os.LookupEnv("ANALYSIS_SPIFFE_ID")
 		if !ok {
 			// Default expected SPIFFEID for analysis workload
 			analysisSPIFFEID = "spiffe://%s/ns/analytics/sa/default"
