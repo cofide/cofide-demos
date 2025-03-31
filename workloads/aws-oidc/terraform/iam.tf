@@ -12,7 +12,7 @@ resource "aws_iam_role" "iam_role_oidc_discovery_provider" {
         Condition = {
           StringEquals = {
             "${var.spire_oidc_discovery_provider_domain}:aud" = "${var.spire_jwt_svid_audience}",
-            "${var.spire_oidc_discovery_provider_domain}:sub" = "spiffe://${var.trust_domain}/ns/${var.k8s_namespace}/sa/default"
+            "${var.spire_oidc_discovery_provider_domain}:sub" = "spiffe://${var.trust_domain}${var.consumer_spiffe_id_suffix}"
           }
         }
       }
