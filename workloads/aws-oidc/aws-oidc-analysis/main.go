@@ -37,10 +37,18 @@ func run(ctx context.Context) error {
 		}
 		defer source.Close()
 
+		var consumerSPIFFEID string
+		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFEID")
+		if !ok {
+			// Default expected SPIFFEID for consumer workload
+			consumerSPIFFEID = "spiffe://%s/ns/production/sa/default"
+		}
+
 		spiffeID := fmt.Sprintf(
-			"spiffe://%s/ns/production/sa/default",
+			consumerSPIFFEID,
 			os.Getenv("CONSUMER_TRUST_DOMAIN"),
 		)
+
 		allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
 		tlsConfig = tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeID(allowedSPIFFEID))
 	}

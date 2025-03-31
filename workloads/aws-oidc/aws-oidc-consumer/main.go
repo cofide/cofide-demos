@@ -53,8 +53,15 @@ func run(ctx context.Context) error {
 		}
 		defer source.Close()
 
+		var analysisSPIFFEID string
+		analysisSPIFFEID, ok := os.LookupEnv("ANALYSIS_SPIFFEID")
+		if !ok {
+			// Default expected SPIFFEID for analysis workload
+			analysisSPIFFEID = "spiffe://%s/ns/analytics/sa/default"
+		}
+
 		spiffeID := fmt.Sprintf(
-			"spiffe://%s/ns/analytics/sa/default",
+			analysisSPIFFEID,
 			os.Getenv("ANALYSIS_TRUST_DOMAIN"),
 		)
 		allowedSPIFFEID := spiffeid.RequireFromString(spiffeID)
