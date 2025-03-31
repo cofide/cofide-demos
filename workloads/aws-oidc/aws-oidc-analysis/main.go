@@ -38,7 +38,7 @@ func run(ctx context.Context) error {
 		defer source.Close()
 
 		var consumerSPIFFEID string
-		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFEID")
+		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFE_ID")
 		if !ok {
 			// Default expected SPIFFEID for consumer workload
 			consumerSPIFFEID = "spiffe://%s/ns/production/sa/default"
