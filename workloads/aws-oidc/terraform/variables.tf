@@ -27,3 +27,8 @@ variable "trust_domain" {
   description = "The trust domain where the workloads are deployed."
   type        = string
 }
+
+variable "consumer_spiffe_id_path" {
+  description = "Path used by the consumer workload's SPIFFEID e.g. /ns/production"
+  type = string
+}
