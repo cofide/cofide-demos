@@ -56,7 +56,7 @@ func run(ctx context.Context) error {
 		var analysisSPIFFEID string
 		analysisSPIFFEID, ok := os.LookupEnv("ANALYSIS_SPIFFE_ID")
 		if !ok {
-			// Default expected SPIFFEID for analysis workload
+			// Default expected SPIFFE ID for analysis workload
 			analysisSPIFFEID = "spiffe://%s/ns/analytics/sa/default"
 		}
 
