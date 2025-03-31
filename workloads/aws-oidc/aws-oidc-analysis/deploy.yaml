@@ -45,6 +45,8 @@ spec:
             value: ${CONSUMER_TRUST_DOMAIN}
           - name: CONSUMER_SERVER_ADDRESS
             value: ${CONSUMER_SERVER_ADDRESS}
+          - name: CONSUMER_SPIFFE_ID
+            value: ${CONSUMER_SPIFFE_ID}
           - name: ENABLE_TLS
             value: "true"
       volumes:
