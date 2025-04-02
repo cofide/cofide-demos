@@ -1,0 +1,29 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+jobs:
+  build-release:
+    name: build-release
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Setup KO
+        uses: ko-build/setup-ko@v0.6
+      - name: Build all demos
+        run: |
+          tag=${GITHUB_REF#refs/*/}
+          echo $tag
+          export RELEASE_TAG=$tag
+          just build-demos

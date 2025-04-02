@@ -26,7 +26,12 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong/server
+        image: ghcr.io/cofide/cofide-demos/ping-pong-server:${IMAGE_TAG}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "200m"
         ports:
         - containerPort: 8443
         volumeMounts:

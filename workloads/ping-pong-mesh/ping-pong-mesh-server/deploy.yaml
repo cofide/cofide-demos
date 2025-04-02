@@ -33,9 +33,17 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ko://github.com/cofide/cofide-demos/workloads/ping-pong-mesh/server
+        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-server:${IMAGE_TAG}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "200m"
+        env:
+        - name: PORT
+          value: ":${PING_PONG_SERVER_SERVICE_PORT}"
         ports:
-        - containerPort: 8443
+        - containerPort: ${PING_PONG_SERVER_SERVICE_PORT}
 ---
 
 apiVersion: v1
@@ -48,6 +56,6 @@ spec:
     mode: cofide
   ports:
     - protocol: TCP
-      port: 8443
-      targetPort: 8443
+      port: ${PING_PONG_SERVER_SERVICE_PORT}
+      targetPort: ${PING_PONG_SERVER_SERVICE_PORT}
   type: LoadBalancer
