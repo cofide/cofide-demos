@@ -19,19 +19,21 @@ check-deps:
     done
     echo "All dependencies installed"
 
-# Build all demo ping-pong applications
-build-demos: build-ping-pong build-ping-pong-mesh build-aws-oidc
+build-demos: build-ping-pong build-ping-pong-mesh build-ping-pong-cofide build-aws-oidc
 
-# Build the ping-pong application
 build-ping-pong:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong/ping-pong-server -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong/ping-pong-client -B -t $RELEASE_TAG
 
-# Build the HTTP ping-pong applications to be deployed in a service mesh
 build-ping-pong-mesh:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-mesh/ping-pong-mesh-server -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-mesh/ping-pong-mesh-client -B -t $RELEASE_TAG
 
+build-ping-pong-cofide:
+  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-cofide/ping-pong-cofide-server -B -t $RELEASE_TAG
+  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-cofide/ping-pong-cofide-client -B -t $RELEASE_TAG
+
 build-aws-oidc:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-consumer -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-analysis -B -t $RELEASE_TAG
+
