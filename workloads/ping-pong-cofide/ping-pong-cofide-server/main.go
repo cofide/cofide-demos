@@ -57,7 +57,10 @@ func run(ctx context.Context, env *Env) error {
 	insecureMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("...pong from insecure server"))
+		_, err := w.Write([]byte("...pong from insecure server"))
+		if err != nil {
+			fmt.Printf("insecure server error: %v\n", err)
+		}
 	})
 
 	go func() {
