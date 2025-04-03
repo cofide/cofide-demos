@@ -27,6 +27,10 @@ spec:
       containers:
       - name: ping-pong-server
         image: ghcr.io/cofide/cofide-demos/ping-pong-cofide-server:${IMAGE_TAG}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: "100m"
         ports:
         - containerPort: 8443
         volumeMounts:
