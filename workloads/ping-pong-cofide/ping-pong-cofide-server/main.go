@@ -45,7 +45,7 @@ func run(ctx context.Context, env *Env) error {
 	secureServer := cofide_http_server.NewServer(&http.Server{
 		Addr:    env.SecurePort,
 		Handler: secureMux,
-	}, cofide_http_server.WithSVIDMatch(id.Equals("sa", "ping-pong-client")),
+	}, cofide_http_server.WithSVIDMatch(id.Equals("ns", "production")),
 	)
 	secureMux.HandleFunc("/", handler(secureServer))
 
