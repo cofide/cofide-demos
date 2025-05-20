@@ -1,8 +1,8 @@
 module github.com/cofide/cofide-demos
 
-go 1.24.0
+go 1.24.2
 
-toolchain go1.24.1
+toolchain go1.24.3
 
 require github.com/spiffe/go-spiffe/v2 v2.5.0
 
@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.79.3
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.19
-	github.com/cofide/cofide-sdk-go v0.2.0
+	github.com/cofide/cofide-sdk-go v0.2.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
