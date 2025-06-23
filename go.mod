@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.70
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.2
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0
-	github.com/cofide/cofide-sdk-go v0.2.1
+	github.com/cofide/cofide-sdk-go v0.3.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
