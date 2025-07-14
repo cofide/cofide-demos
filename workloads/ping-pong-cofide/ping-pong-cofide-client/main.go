@@ -11,18 +11,39 @@ import (
 	"strconv"
 	"time"
 
-	cofide_http "github.com/cofide/cofide-sdk-go/http/client"
+	cofidehttp "github.com/cofide/cofide-sdk-go/http/client"
 )
 
 func main() {
-	if err := run(context.Background(), getEnv()); err != nil {
+	setupLogging()
+	env, err := newEnv()
+	if err != nil {
+		log.Fatal("", err)
+	}
+	if err := run(context.Background(), env); err != nil {
 		log.Fatal("", err)
 	}
 }
 
-type Env struct {
-	ServerAddress string
-	ServerPort    int
+func setupLogging() {
+	logOpts := &slog.HandlerOptions{Level: slog.LevelDebug}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, logOpts))
+	slog.SetDefault(logger)
+}
+
+type env struct {
+	serverAddress string
+	serverPort    int
+	xdsServerURI  string
+	xdsNodeID     string
+}
+
+func getEnv(variable string) (string, error) {
+	v, ok := os.LookupEnv(variable)
+	if !ok {
+		return "", fmt.Errorf("missing required environment variable %s", variable)
+	}
+	return v, nil
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -47,15 +68,27 @@ func getEnvIntWithDefault(variable string, defaultValue int) int {
 	return intValue
 }
 
-func getEnv() *Env {
-	return &Env{
-		ServerAddress: getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
-		ServerPort:    getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
+func newEnv() (*env, error) {
+	xdsServerURI, err := getEnv("EXPERIMENTAL_XDS_SERVER_URI")
+	if err != nil {
+		return nil, err
 	}
+	return &env{
+		serverAddress: getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
+		serverPort:    getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
+		xdsServerURI:  xdsServerURI,
+		xdsNodeID:     getEnvWithDefault("EXPERIMENTAL_XDS_NODE_ID", "node"),
+	}, nil
 }
 
-func run(ctx context.Context, env *Env) error {
-	client := cofide_http.NewClient()
+func run(ctx context.Context, env *env) error {
+	client, err := cofidehttp.NewClient(
+		cofidehttp.WithXDS(env.xdsServerURI),
+		cofidehttp.WithXDSNodeID(env.xdsNodeID),
+	)
+	if err != nil {
+		return err
+	}
 
 	for {
 		select {
@@ -67,7 +100,7 @@ func run(ctx context.Context, env *Env) error {
 				slog.Error("problem obtaining client identity", "error", err)
 			}
 			slog.Info(fmt.Sprintf("ping from %s...", identity.ToSpiffeID().String()))
-			if err := ping(client, env.ServerAddress, env.ServerPort); err != nil {
+			if err := ping(client, env.serverAddress, env.serverPort); err != nil {
 				slog.Error("problem reaching server", "error", err)
 			}
 			time.Sleep(5 * time.Second)
@@ -75,7 +108,7 @@ func run(ctx context.Context, env *Env) error {
 	}
 }
 
-func ping(client *cofide_http.Client, serverAddr string, serverPort int) error {
+func ping(client *cofidehttp.Client, serverAddr string, serverPort int) error {
 	url := &url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
