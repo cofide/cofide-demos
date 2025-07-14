@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/url"
 	"os"
@@ -18,10 +17,12 @@ func main() {
 	setupLogging()
 	env, err := newEnv()
 	if err != nil {
-		log.Fatal("", err)
+		slog.Error("Failed to process environment variables", "error", err)
+		os.Exit(1)
 	}
 	if err := run(context.Background(), env); err != nil {
-		log.Fatal("", err)
+		slog.Error("Fatal error", "error", err)
+		os.Exit(1)
 	}
 }
 
