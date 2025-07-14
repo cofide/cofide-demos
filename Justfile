@@ -2,7 +2,7 @@
 set export
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-export KO_DOCKER_REPO := env_var_or_default("KO_DOCKER_REPO", "kind.local")
+export KO_DOCKER_REPO := env_var_or_default("KO_DOCKER_REPO", "ko.local")
 export KIND_CLUSTER_NAME := env_var_or_default("KIND_CLUSTER_NAME", "kind")
 export RELEASE_TAG := env_var_or_default("RELEASE_TAG", "latest")
 
