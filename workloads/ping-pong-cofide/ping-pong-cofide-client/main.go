@@ -70,7 +70,7 @@ func getEnvIntWithDefault(variable string, defaultValue int) int {
 }
 
 func newEnv() (*env, error) {
-	xdsServerURI, err := getEnv("EXPERIMENTAL_XDS_SERVER_URI")
+	xdsServerURI, err := getEnv("XDS_SERVER_URI")
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func newEnv() (*env, error) {
 		serverAddress: getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo"),
 		serverPort:    getEnvIntWithDefault("PING_PONG_SERVICE_PORT", 8443),
 		xdsServerURI:  xdsServerURI,
-		xdsNodeID:     getEnvWithDefault("EXPERIMENTAL_XDS_NODE_ID", "node"),
+		xdsNodeID:     getEnvWithDefault("XDS_NODE_ID", "node"),
 	}, nil
 }
 
@@ -88,7 +88,7 @@ func run(ctx context.Context, env *env) error {
 		cofidehttp.WithXDSNodeID(env.xdsNodeID),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating Cofide HTTP client: %w", err)
 	}
 
 	for {
