@@ -52,6 +52,11 @@ var (
 		Name: "svid_not_after",
 		Help: "The timestamp when the current SVID certificate expires (NotAfter)",
 	})
+
+	svidURISAN = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "svid_uri_san",
+		Help: "The SPIFFE ID URI SAN of the current SVID certificate",
+	}, []string{"spiffe_id"})
 )
 
 func main() {
@@ -77,11 +82,27 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 	return v
 }
 
+func getEnvBooleanWithDefault(variable string, defaultValue bool) bool {
+	v, ok := os.LookupEnv(variable)
+	if !ok {
+		return defaultValue
+	}
+	switch v {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+	log.Printf("Invalid value for %s, using default: %v", variable, defaultValue)
+	return defaultValue
+}
+
 func getEnv() *Env {
 	return &Env{
 		Port:             getEnvWithDefault("PORT", ":8443"),
 		MetricsPort:      getEnvWithDefault("METRICS_PORT", ":8080"),
 		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
+		MetricsEnabled:   getEnvBooleanWithDefault("METRICS_ENABLED", true),
 	}
 }
 
@@ -92,9 +113,13 @@ func run(ctx context.Context, env *Env) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", metricsWrapper(handler))
 
-	// Expose metrics endpoint
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(env.MetricsPort, nil)
+	if env.MetricsEnabled {
+		// Expose metrics endpoint in both the mTLS server and a default HTTP server
+		mux.Handle("/metrics", promhttp.Handler())
+		http.Handle("/metrics", promhttp.Handler())
+		go http.ListenAndServe(env.MetricsPort, nil)
+
+	}
 
 	source, err := workloadapi.NewX509Source(ctx,
 		workloadapi.WithClientOptions(
@@ -125,6 +150,8 @@ func run(ctx context.Context, env *Env) error {
 					notAfter := svid.Certificates[0].NotAfter
 					svidNotAfter.Set(float64(notAfter.Unix()))
 				}
+				// Set the SPIFFE ID URI SAN metric
+				svidURISAN.WithLabelValues(svid.ID.String()).Set(1)
 			}
 		}
 	}()
@@ -133,6 +160,7 @@ func run(ctx context.Context, env *Env) error {
 	lastX509SourceUpdate.Set(float64(time.Now().Unix()))
 	if svid, err := source.GetX509SVID(); err == nil && len(svid.Certificates) > 0 {
 		svidNotAfter.Set(float64(svid.Certificates[0].NotAfter.Unix()))
+		svidURISAN.WithLabelValues(svid.ID.String()).Set(1)
 	}
 
 	tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
