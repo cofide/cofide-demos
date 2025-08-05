@@ -29,10 +29,6 @@ var (
 		Name: "svid_failures",
 		Help: "The total number of SVID failures",
 	})
-	tlsErrors = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "tls_errors",
-		Help: "The total number of TLS errors",
-	})
 	requestsTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "requests_total",
 		Help: "The total number of requests sent",
