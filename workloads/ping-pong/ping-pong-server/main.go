@@ -117,7 +117,11 @@ func run(ctx context.Context, env *Env) error {
 		// Expose metrics endpoint in both the mTLS server and a default HTTP server
 		mux.Handle("/metrics", promhttp.Handler())
 		http.Handle("/metrics", promhttp.Handler())
-		go http.ListenAndServe(env.MetricsPort, nil)
+		go func() {
+			if err := http.ListenAndServe(env.MetricsPort, nil); err != nil {
+				log.Printf("Error starting metrics server: %v", err)
+			}
+		}()
 
 	}
 

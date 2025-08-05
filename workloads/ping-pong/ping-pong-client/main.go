@@ -143,7 +143,11 @@ func run(ctx context.Context, env *Env) error {
 	if env.MetricsEnabled {
 		// Expose metrics endpoint
 		http.Handle("/metrics", promhttp.Handler())
-		go http.ListenAndServe(env.MetricsPort, nil)
+		go func() {
+			if err := http.ListenAndServe(env.MetricsPort, nil); err != nil {
+				log.Printf("Error starting metrics server: %v", err)
+			}
+		}()
 
 		// Monitor SVID updates
 		go func() {
