@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -25,9 +24,9 @@ var (
 		Name: "ping_errors",
 		Help: "The total number of ping errors",
 	})
-	svidFailures = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "svid_failures",
-		Help: "The total number of SVID failures",
+	svidUpdates = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "svid_updates",
+		Help: "The total number of SVID updates",
 	})
 	requestsTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "requests_total",
@@ -39,7 +38,7 @@ var (
 	})
 
 	successfulConnections = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "successful_connections",
+		Name: "requests_success",
 		Help: "The total number of successful connections",
 	})
 
@@ -62,7 +61,7 @@ var (
 func main() {
 	clientStartTime.Set(float64(time.Now().Unix()))
 	if err := run(context.Background(), getEnv()); err != nil {
-		log.Fatal(err)
+		slog.Error("Error running client", "error", err)
 	}
 }
 
@@ -111,14 +110,12 @@ func getEnvBooleanWithDefault(variable string, defaultValue bool) bool {
 	if !ok {
 		return defaultValue
 	}
-	switch v {
-	case "true":
-		return true
-	case "false":
-		return false
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		slog.Error("Invalid boolean value", "variable", variable, "error", err)
+		return defaultValue
 	}
-	log.Printf("Invalid value for %s, using default: %v", variable, defaultValue)
-	return defaultValue
+	return b
 }
 
 func run(ctx context.Context, env *Env) error {
@@ -131,7 +128,6 @@ func run(ctx context.Context, env *Env) error {
 
 	source, err := workloadapi.NewX509Source(initCtx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
 	if err != nil {
-		svidFailures.Inc()
 		return fmt.Errorf("unable to obtain SVID: %w", err)
 	}
 	defer source.Close()
@@ -140,8 +136,9 @@ func run(ctx context.Context, env *Env) error {
 		// Expose metrics endpoint
 		http.Handle("/metrics", promhttp.Handler())
 		go func() {
+			slog.Info("Metrics enabled, starting server", "port", env.MetricsPort)
 			if err := http.ListenAndServe(env.MetricsPort, nil); err != nil {
-				log.Printf("Error starting metrics server: %v", err)
+				slog.Error("Error starting metrics server", "error", err)
 			}
 		}()
 
@@ -156,7 +153,7 @@ func run(ctx context.Context, env *Env) error {
 
 					svid, err := source.GetX509SVID()
 					if err != nil {
-						log.Printf("Error getting X509SVID: %v", err)
+						slog.Error("Error getting X509SVID", "error", err)
 						continue
 					}
 					if len(svid.Certificates) > 0 {
@@ -165,6 +162,7 @@ func run(ctx context.Context, env *Env) error {
 					}
 					// Set the SPIFFE ID URI SAN metric
 					svidURISAN.WithLabelValues(svid.ID.String()).Set(1)
+					svidUpdates.Inc()
 				}
 			}
 		}()
@@ -184,7 +182,7 @@ func run(ctx context.Context, env *Env) error {
 		},
 	}
 
-	log.Printf("Client starting with metrics at /metrics on %s", env.MetricsPort)
+	slog.Info("Client starting")
 
 	for {
 		slog.Info("ping...")
