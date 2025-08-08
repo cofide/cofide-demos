@@ -62,6 +62,7 @@ func main() {
 	clientStartTime.Set(float64(time.Now().Unix()))
 	if err := run(context.Background(), getEnv()); err != nil {
 		slog.Error("Error running client", "error", err)
+		os.Exit(1)
 	}
 }
 
