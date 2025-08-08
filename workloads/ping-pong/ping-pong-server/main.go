@@ -61,6 +61,7 @@ func main() {
 
 	if err := run(context.Background(), getEnv()); err != nil {
 		slog.Error("Error running server", "error", err)
+		os.Exit(1)
 	}
 }
 
