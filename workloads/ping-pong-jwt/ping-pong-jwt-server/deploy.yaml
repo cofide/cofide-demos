@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ping-pong-server
+  labels:
+    app: ping-pong-server
+    mode: cofide
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ping-pong-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ping-pong-server
+      mode: cofide
+  template:
+    metadata:
+      labels:
+        app: ping-pong-server
+        mode: cofide
+    spec:
+      serviceAccountName: ping-pong-server
+      containers:
+      - name: ping-pong-server
+        image: ghcr.io/cofide/cofide-demos/ping-pong-jwt-server:${IMAGE_TAG}
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+            - name: spiffe-workload-api
+              mountPath: /spiffe-workload-api
+              readOnly: true
+        env:
+        - name: SPIFFE_ENDPOINT_SOCKET
+          value: unix:///spiffe-workload-api/spire-agent.sock
+      volumes:
+      - name: spiffe-workload-api
+        csi:
+          driver: "csi.spiffe.io"
+          readOnly: true
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ping-pong-server
+spec:
+  selector:
+    app: ping-pong-server
+    mode: cofide
+  ports:
+    - protocol: TCP
+      port: 8443
+      targetPort: 8443
+  type: LoadBalancer
