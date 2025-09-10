@@ -34,7 +34,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Setup Ko
-        uses: ko-build/setup-ko@v0.6
+        uses: ko-build/setup-ko@v0.9
         env:
           # Verify build with ephemeral ko registry
           # We only push to gchr on release
