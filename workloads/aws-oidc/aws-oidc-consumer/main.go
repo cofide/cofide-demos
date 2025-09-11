@@ -51,7 +51,9 @@ func run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("unable to create X509Source: %w", err)
 		}
-		defer source.Close()
+		defer func() {
+			_ = source.Close()
+		}()
 
 		var analysisSPIFFEID string
 		analysisSPIFFEID, ok := os.LookupEnv("ANALYSIS_SPIFFE_ID")

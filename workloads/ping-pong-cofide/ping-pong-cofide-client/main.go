@@ -119,7 +119,9 @@ func ping(client *cofidehttp.Client, serverAddr string, serverPort int) error {
 	if err != nil {
 		return err
 	}
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

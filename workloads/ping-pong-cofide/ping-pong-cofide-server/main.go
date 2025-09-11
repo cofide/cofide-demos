@@ -122,7 +122,7 @@ func handler(server *cofide_http_server.Server) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		_, err = w.Write([]byte(fmt.Sprintf("...pong from %s", identity.ToSpiffeID().String())))
+		_, err = fmt.Fprintf(w, "...pong from %s", identity.ToSpiffeID().String())
 		if err != nil {
 			slog.Error("Error writing response", "error", err)
 		}
