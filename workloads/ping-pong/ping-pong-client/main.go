@@ -131,7 +131,9 @@ func run(ctx context.Context, env *Env) error {
 	if err != nil {
 		return fmt.Errorf("unable to obtain SVID: %w", err)
 	}
-	defer source.Close()
+	defer func() {
+		_ = source.Close()
+	}()
 
 	if env.MetricsEnabled {
 		// Expose metrics endpoint
@@ -207,7 +209,9 @@ func ping(client *http.Client, serverAddr string, serverPort int) error {
 	if err != nil {
 		return err
 	}
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

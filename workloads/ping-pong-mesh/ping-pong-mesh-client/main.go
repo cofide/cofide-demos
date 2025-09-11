@@ -61,7 +61,9 @@ func ping(client *http.Client, serverAddr, serverPort string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

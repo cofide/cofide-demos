@@ -119,7 +119,9 @@ func run(ctx context.Context, env *Env) error {
 	if err != nil {
 		return fmt.Errorf("unable to obtain SVID: %w", err)
 	}
-	defer source.Close()
+	defer func() {
+		_ = source.Close()
+	}()
 
 	runMetricsUpdateWatcher(env, source, ctx)
 

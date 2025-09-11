@@ -35,7 +35,9 @@ func run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("unable to create X509Source: %w", err)
 		}
-		defer source.Close()
+		defer func() {
+			_ = source.Close()
+		}()
 
 		var consumerSPIFFEID string
 		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFE_ID")
@@ -75,7 +77,9 @@ func getBuckets(client http.Client, serverAddress string) error {
 		return fmt.Errorf("error connecting to %q: %w", serverAddress, err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("unable to read body: %w", err)
