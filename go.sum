@@ -50,8 +50,8 @@ github.com/cloudwego/base64x v0.1.6 h1:t11wG9AECkCDk5fMSoxmufanudBtJ+/HemLstXDLI
 github.com/cloudwego/base64x v0.1.6/go.mod h1:OFcloc187FXDaYHvrNIjxSe8ncn0OOM8gEHfghB2IPU=
 github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 h1:aQ3y1lwWyqYPiWZThqv1aFbZMiM9vblcSArJRf2Irls=
 github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443/go.mod h1:W+zGtBO5Y1IgJhy4+A9GOqVhqLpfZi+vwmdNXUehLA8=
-github.com/cofide/cofide-sdk-go v0.4.0 h1:1mbn1Slszz3onkp5SHf332MRDJE4ui4uie5Z2OZmhjQ=
-github.com/cofide/cofide-sdk-go v0.4.0/go.mod h1:MJ0iPUH0AmYZebiH5trHRWMvvBo+jLc5J4HwY7bcS0g=
+github.com/cofide/cofide-sdk-go v0.4.2 h1:s8uzE1LjLG10z9ujYVitkyLVPBKUJeRpT4Y2eP9q/pY=
+github.com/cofide/cofide-sdk-go v0.4.2/go.mod h1:LVliwlkySocc1T5ABC2DctHB1ZcVhfT5DwF6OicWvos=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
