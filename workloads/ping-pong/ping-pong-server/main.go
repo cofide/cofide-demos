@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 )
@@ -70,6 +71,17 @@ type Env struct {
 	MetricsPort      string
 	SpiffeSocketPath string
 	MetricsEnabled   bool
+	// ClientSPIFFEID is the expected SPIFFEID of the
+	// client making inbound requests to this server
+	ClientSPIFFEID string
+}
+
+func mustGetEnv(variable string) string {
+	v, ok := os.LookupEnv(variable)
+	if !ok {
+		panic(fmt.Sprintf("Unset environment variable: %s", variable))
+	}
+	return v
 }
 
 func getEnvWithDefault(variable string, defaultValue string) string {
@@ -99,6 +111,7 @@ func getEnv() *Env {
 		MetricsPort:      getEnvWithDefault("METRICS_PORT", ":8080"),
 		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
 		MetricsEnabled:   getEnvBooleanWithDefault("METRICS_ENABLED", true),
+		ClientSPIFFEID:   mustGetEnv("CLIENT_SPIFFE_ID"),
 	}
 }
 
@@ -132,7 +145,12 @@ func run(ctx context.Context, env *Env) error {
 		svidURISAN.WithLabelValues(svid.ID.String()).Set(1)
 	}
 
-	tlsConfig := tlsconfig.MTLSServerConfig(source, source, tlsconfig.AuthorizeAny())
+	// Only authorize inbound calls from the expected client SPIFFE IDs
+	tlsConfig := tlsconfig.MTLSServerConfig(
+		source,
+		source,
+		tlsconfig.AuthorizeID(spiffeid.RequireFromString(env.ClientSPIFFEID)),
+	)
 	server := &http.Server{
 		Addr:              env.Port,
 		TLSConfig:         tlsConfig,
