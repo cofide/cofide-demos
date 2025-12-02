@@ -79,7 +79,8 @@ type Env struct {
 func mustGetEnv(variable string) string {
 	v, ok := os.LookupEnv(variable)
 	if !ok {
-		panic(fmt.Sprintf("Unset environment variable: %s", variable))
+		slog.Error("Unset environment variable", "variable", variable)
+		os.Exit(1)
 	}
 	return v
 }
@@ -146,10 +147,14 @@ func run(ctx context.Context, env *Env) error {
 	}
 
 	// Only authorize inbound calls from the expected client SPIFFE IDs
+	clientSPIFFEID, err := spiffeid.FromString(env.ClientSPIFFEID)
+	if err != nil {
+		return fmt.Errorf("failed to parse client SPIFFE ID: %w", err)
+	}
 	tlsConfig := tlsconfig.MTLSServerConfig(
 		source,
 		source,
-		tlsconfig.AuthorizeID(spiffeid.RequireFromString(env.ClientSPIFFEID)),
+		tlsconfig.AuthorizeID(clientSPIFFEID),
 	)
 	server := &http.Server{
 		Addr:              env.Port,
