@@ -41,6 +41,8 @@ spec:
         env:
         - name: SPIFFE_ENDPOINT_SOCKET
           value: unix:///spiffe-workload-api/spire-agent.sock
+        - name: CLIENT_SPIFFE_ID
+          value: "${CLIENT_SPIFFE_ID}"
       volumes:
       - name: spiffe-workload-api
         csi:
