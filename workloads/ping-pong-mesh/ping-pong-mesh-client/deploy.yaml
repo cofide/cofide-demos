@@ -39,7 +39,7 @@ spec:
         resources:
           requests:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "100m"
         env:
         - name: PING_PONG_SERVICE_HOST
           value: "${PING_PONG_SERVER_SERVICE_HOST}"
