@@ -33,6 +33,10 @@ build-ping-pong-cofide:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-cofide/ping-pong-cofide-server -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-cofide/ping-pong-cofide-client -B -t $RELEASE_TAG
 
+build-ping-pong-jwt:
+  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-jwt/ping-pong-jwt-server -B -t $RELEASE_TAG
+  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-jwt/ping-pong-jwt-client -B -t $RELEASE_TAG
+
 build-aws-oidc:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-consumer -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-analysis -B -t $RELEASE_TAG
