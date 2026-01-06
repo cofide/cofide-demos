@@ -217,6 +217,9 @@ func ping(client *http.Client, serverAddr string, serverPort int) error {
 	if err != nil {
 		return err
 	}
+	if r.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d: %s", r.StatusCode, body[:1024])
+	}
 	slog.Info(string(body))
 	return nil
 }

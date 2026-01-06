@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -126,6 +127,9 @@ func ping(client *cofidehttp.Client, serverAddr string, serverPort int) error {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
+	}
+	if r.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d: %s", r.StatusCode, body[:1024])
 	}
 	slog.Info(string(body))
 	return nil

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -13,7 +12,7 @@ import (
 )
 
 func main() {
-	if err := run(context.Background(), getEnv()); err != nil {
+	if err := run(getEnv()); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -38,7 +37,7 @@ func getEnv() *Env {
 	}
 }
 
-func run(ctx context.Context, env *Env) error {
+func run(env *Env) error {
 	client := &http.Client{
 		Transport: &http.Transport{},
 	}
@@ -68,6 +67,9 @@ func ping(client *http.Client, serverAddr, serverPort string) error {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
+	}
+	if r.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d: %s", r.StatusCode, body[:1024])
 	}
 	slog.Info(string(body))
 	return nil
