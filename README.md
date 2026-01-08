@@ -1,6 +1,6 @@
 # Cofide Demos
 
-This repository has example applications that are used to demonstrate Cofide's open source tools, including `cofidectl`. 
+This repository has example applications that are used to demonstrate Cofide's open source tools, including `cofidectl`.
 
 The examples include `ping-pong` that can be deployed in a single Cofide trust zone, or federated across trust zones with multiple clusters.
 
@@ -12,8 +12,8 @@ There are several flavours of `ping-pong`:
 
 ## Deploy a single trust zone Cofide instance
 
-See the [`cofidectl` docs](https://www.github.com/cofide/cofidectl/README.md#quickstart)
+See the [`cofidectl` docs](https://github.com/cofide/cofidectl?tab=readme-ov-file#quickstart)
 
 ### Deploy an additional Cofide trust zone instance and federate the workloads
- 
-See the [`cofidectl` docs](https://www.github.com/cofide/cofidectl/docs/multi-tz-federation.md)
+
+See the [`cofidectl` docs](https://github.com/cofide/cofidectl/blob/main/docs/multi-tz-federation.md)
