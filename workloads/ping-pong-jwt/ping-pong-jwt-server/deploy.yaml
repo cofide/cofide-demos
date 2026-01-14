@@ -6,7 +6,6 @@ metadata:
     app: ping-pong-server
     mode: cofide
 ---
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,31 +24,29 @@ spec:
     spec:
       serviceAccountName: ping-pong-server
       containers:
-      - name: ping-pong-server
-        image: ghcr.io/cofide/cofide-demos/ping-pong-jwt-server:${IMAGE_TAG}
-        imagePullPolicy: Always
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-        ports:
-        - containerPort: 8443
-        volumeMounts:
+        - name: ping-pong-server
+          image: ghcr.io/cofide/cofide-demos/ping-pong-jwt-server:${IMAGE_TAG}
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          ports:
+            - containerPort: 8443
+          volumeMounts:
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api
               readOnly: true
-        env:
-        - name: SPIFFE_ENDPOINT_SOCKET
-          value: unix:///spiffe-workload-api/spire-agent.sock
-        - name: CLIENT_SPIFFE_ID
-          value: ${CLIENT_SPIFFE_ID}
+          env:
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: unix:///spiffe-workload-api/spire-agent.sock
+            - name: CLIENT_SPIFFE_ID
+              value: ${CLIENT_SPIFFE_ID}
       volumes:
-      - name: spiffe-workload-api
-        csi:
-          driver: "csi.spiffe.io"
-          readOnly: true
+        - name: spiffe-workload-api
+          csi:
+            driver: "csi.spiffe.io"
+            readOnly: true
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
