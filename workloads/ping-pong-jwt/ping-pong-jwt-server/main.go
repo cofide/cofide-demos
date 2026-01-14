@@ -61,19 +61,22 @@ type pingPongServer struct {
 }
 
 func run(ctx context.Context, env *Env) error {
-	ctx, cancel := context.WithTimeout(ctx, workloadAPITimeout)
+	initCtx, cancel := context.WithTimeout(ctx, workloadAPITimeout)
 	defer cancel()
+
+	slog.Info("Fetching server JWT-SVID")
+	source, err := workloadapi.NewJWTSource(initCtx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
+	if err != nil {
+		return fmt.Errorf("unable to obtain SVID: %w", err)
+	}
+	defer func() { _ = source.Close() }()
 
 	slog.Info("Creating workload client")
 	client, err := workloadapi.New(ctx, workloadapi.WithAddr(env.SpiffeSocketPath))
 	if err != nil {
 		return fmt.Errorf("failed to create workload client: %w", err)
 	}
-	defer func() {
-		_ = client.Close()
-	}()
-
-	slog.Info("Created workload client")
+	defer func() { _ = client.Close() }()
 
 	pps := &pingPongServer{
 		wlClient:         client,
@@ -108,9 +111,9 @@ func (s *pingPongServer) handler(w http.ResponseWriter, r *http.Request) {
 	audience := "ping-pong-server"
 	clientSVID, err := s.wlClient.ValidateJWTSVID(r.Context(), token, audience)
 	if err != nil {
+		slog.Error("Invalid client token", "error", err.Error())
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte("Invalid client token provided"))
-		_, _ = w.Write([]byte(err.Error()))
 		return
 	}
 
@@ -123,6 +126,17 @@ func (s *pingPongServer) handler(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("Invalid client ID"))
 		return
 	}
+
+	// Send server SVID to client for mutual verification
+	svid, err := s.wlClient.FetchJWTSVID(r.Context(), jwtsvid.Params{Audience: "ping-pong-client"})
+	if err != nil {
+		slog.Error("Failed to fetch server JWT-SVID", "error", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Internal server error"))
+		return
+	}
+	w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", svid.Marshal()))
+
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)

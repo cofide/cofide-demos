@@ -37,6 +37,8 @@ spec:
           value: "${PING_PONG_SERVER_SERVICE_URL}"
         - name: SPIFFE_ENDPOINT_SOCKET
           value: unix:///spiffe-workload-api/spire-agent.sock
+        - name: SERVER_SPIFFE_ID
+          value: ${SERVER_SPIFFE_ID}
         volumeMounts:
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api
