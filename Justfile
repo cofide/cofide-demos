@@ -1,10 +1,9 @@
 
-set export
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-export KO_DOCKER_REPO := env_var_or_default("KO_DOCKER_REPO", "ko.local")
-export KIND_CLUSTER_NAME := env_var_or_default("KIND_CLUSTER_NAME", "kind")
-export RELEASE_TAG := env_var_or_default("RELEASE_TAG", "latest")
+export KO_DOCKER_REPO := env("KO_DOCKER_REPO", "ko.local")
+export KIND_CLUSTER_NAME := env("KIND_CLUSTER_NAME", "kind")
+export RELEASE_TAG := env("RELEASE_TAG", "latest")
 
 lint *args:
     golangci-lint run --show-stats {{args}}
@@ -19,7 +18,7 @@ check-deps:
     done
     echo "All dependencies installed"
 
-build-demos: build-ping-pong build-ping-pong-mesh build-ping-pong-cofide build-aws-oidc
+build-demos: build-ping-pong build-ping-pong-mesh build-ping-pong-cofide build-aws-oidc build-ping-pong-jwt
 
 build-ping-pong:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong/ping-pong-server -B -t $RELEASE_TAG
@@ -40,4 +39,3 @@ build-ping-pong-jwt:
 build-aws-oidc:
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-consumer -B -t $RELEASE_TAG
   ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-analysis -B -t $RELEASE_TAG
-
