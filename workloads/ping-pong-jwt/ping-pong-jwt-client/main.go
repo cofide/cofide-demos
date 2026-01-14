@@ -46,8 +46,10 @@ func getEnvWithDefault(variable string, defaultValue string) string {
 }
 
 func getEnv() *Env {
+	host := getEnvWithDefault("PING_PONG_SERVICE_HOST", "ping-pong-server.demo")
+	port := getEnvWithDefault("PING_PONG_SERVICE_PORT", "8443")
 	return &Env{
-		ServerURL:        getEnvWithDefault("PING_PONG_SERVICE_URL", "https://ping-pong-server.demo"),
+		ServerURL:        fmt.Sprintf("http://%s:%s", host, port),
 		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
 		ServerSPIFFEID:   mustGetEnv("SERVER_SPIFFE_ID"),
 	}

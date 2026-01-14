@@ -31,8 +31,10 @@ spec:
               memory: "128Mi"
               cpu: "100m"
           env:
-            - name: PING_PONG_SERVICE_URL
-              value: "${PING_PONG_SERVER_SERVICE_URL}"
+            - name: PING_PONG_SERVICE_HOST
+              value: "${PING_PONG_SERVER_SERVICE_HOST}"
+            - name: PING_PONG_SERVICE_PORT
+              value: "${PING_PONG_SERVER_SERVICE_PORT}"
             - name: SPIFFE_ENDPOINT_SOCKET
               value: unix:///spiffe-workload-api/spire-agent.sock
             - name: SERVER_SPIFFE_ID
