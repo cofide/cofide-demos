@@ -27,7 +27,7 @@ spec:
       containers:
       - name: ping-pong-client
         image: ghcr.io/cofide/cofide-demos/ping-pong-client:${IMAGE_TAG}
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         resources:
           requests:
             memory: "128Mi"
@@ -42,7 +42,7 @@ spec:
         volumeMounts:
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api
-              readOnly: true      
+              readOnly: true
       volumes:
       - name: spiffe-workload-api
         csi:

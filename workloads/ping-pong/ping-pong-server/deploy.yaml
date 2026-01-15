@@ -27,7 +27,7 @@ spec:
       containers:
       - name: ping-pong-server
         image: ghcr.io/cofide/cofide-demos/ping-pong-server:${IMAGE_TAG}
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         resources:
           requests:
             memory: "128Mi"

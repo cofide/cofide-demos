@@ -26,6 +26,7 @@ spec:
       containers:
         - name: ping-pong-jwt-server
           image: ghcr.io/cofide/cofide-demos/ping-pong-jwt-server:${IMAGE_TAG}
+          imagePullPolicy: Never
           resources:
             requests:
               memory: "128Mi"
