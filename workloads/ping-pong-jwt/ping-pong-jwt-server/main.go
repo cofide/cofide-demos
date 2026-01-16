@@ -14,10 +14,6 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 )
 
-const (
-	workloadAPITimeout = 30 * time.Second
-)
-
 func main() {
 	if err := run(context.Background(), getEnv()); err != nil {
 		log.Fatal(err)
@@ -61,16 +57,6 @@ type pingPongServer struct {
 }
 
 func run(ctx context.Context, env *Env) error {
-	initCtx, cancel := context.WithTimeout(ctx, workloadAPITimeout)
-	defer cancel()
-
-	slog.Info("Fetching server JWT-SVID")
-	source, err := workloadapi.NewJWTSource(initCtx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
-	if err != nil {
-		return fmt.Errorf("unable to obtain SVID: %w", err)
-	}
-	defer func() { _ = source.Close() }()
-
 	slog.Info("Creating workload client")
 	client, err := workloadapi.New(ctx, workloadapi.WithAddr(env.SpiffeSocketPath))
 	if err != nil {
