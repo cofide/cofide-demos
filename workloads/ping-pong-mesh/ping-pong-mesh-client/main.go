@@ -69,7 +69,9 @@ func ping(client *http.Client, serverAddr, serverPort string) error {
 		return err
 	}
 	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d: %s", r.StatusCode, body[:1024])
+		// Limit how much of the response we include in the error
+		body = body[:min(len(body), 1024)]
+		return fmt.Errorf("unexpected status code: %d: %s", r.StatusCode, body)
 	}
 	slog.Info(string(body))
 	return nil
