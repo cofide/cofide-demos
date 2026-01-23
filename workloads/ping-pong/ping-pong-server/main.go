@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -71,9 +72,9 @@ type Env struct {
 	MetricsPort      string
 	SpiffeSocketPath string
 	MetricsEnabled   bool
-	// ClientSPIFFEID is the expected SPIFFEID of the
-	// client making inbound requests to this server
-	ClientSPIFFEID string
+	// ClientSPIFFEIDs is a collection of allowed SPIFFEIDs of the
+	// clients making inbound requests to this server
+	ClientSPIFFEIDs string
 }
 
 func mustGetEnv(variable string) string {
@@ -112,7 +113,7 @@ func getEnv() *Env {
 		MetricsPort:      getEnvWithDefault("METRICS_PORT", ":8080"),
 		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
 		MetricsEnabled:   getEnvBooleanWithDefault("METRICS_ENABLED", true),
-		ClientSPIFFEID:   mustGetEnv("CLIENT_SPIFFE_ID"),
+		ClientSPIFFEIDs:  mustGetEnv("CLIENT_SPIFFE_IDS"),
 	}
 }
 
@@ -147,14 +148,20 @@ func run(ctx context.Context, env *Env) error {
 	}
 
 	// Only authorize inbound calls from the expected client SPIFFE IDs
-	clientSPIFFEID, err := spiffeid.FromString(env.ClientSPIFFEID)
-	if err != nil {
-		return fmt.Errorf("failed to parse client SPIFFE ID: %w", err)
+	allowedSPIFFEIDs := strings.Split(env.ClientSPIFFEIDs, ",")
+	clientSPIFFEIDs := make([]spiffeid.ID, 0, len(allowedSPIFFEIDs))
+	for _, allowedSPIFFEID := range allowedSPIFFEIDs {
+		clientSPIFFEID, err := spiffeid.FromString(allowedSPIFFEID)
+		if err != nil {
+			return fmt.Errorf("failed to parse client SPIFFE ID: %w", err)
+		}
+		clientSPIFFEIDs = append(clientSPIFFEIDs, clientSPIFFEID)
 	}
+	slog.Info("Allowed client SPIFFE IDs", "spiffe_ids", clientSPIFFEIDs)
 	tlsConfig := tlsconfig.MTLSServerConfig(
 		source,
 		source,
-		tlsconfig.AuthorizeID(clientSPIFFEID),
+		tlsconfig.AuthorizeOneOf(clientSPIFFEIDs...),
 	)
 	server := &http.Server{
 		Addr:              env.Port,
