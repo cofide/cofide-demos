@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -31,6 +32,7 @@ func run(ctx context.Context) error {
 	var tlsConfig *tls.Config
 	enableTLS := strings.ToLower(os.Getenv("ENABLE_TLS")) == "true"
 	if enableTLS {
+		slog.Info("Waiting for X.509 SVID")
 		source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(socketPath)))
 		if err != nil {
 			return fmt.Errorf("unable to create X509Source: %w", err)
@@ -38,6 +40,7 @@ func run(ctx context.Context) error {
 		defer func() {
 			_ = source.Close()
 		}()
+		slog.Info("Retrieved X.509 SVID")
 
 		var consumerSPIFFEID string
 		consumerSPIFFEID, ok := os.LookupEnv("CONSUMER_SPIFFE_ID")
