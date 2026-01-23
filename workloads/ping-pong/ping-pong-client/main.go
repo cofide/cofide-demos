@@ -207,7 +207,6 @@ func ping(client *http.Client, serverAddr string, serverPort int) error {
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", serverAddr, serverPort),
 	}).String())
-
 	if err != nil {
 		return err
 	}
