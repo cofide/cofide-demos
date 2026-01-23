@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
+	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 )
 
@@ -191,13 +192,28 @@ func metricsWrapper(next http.HandlerFunc) http.HandlerFunc {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
+	clientID, err := getClientID(r)
+	if err != nil {
+		slog.Warn("Unable to determine client SPIFFE ID", "error", err)
+		http.Error(w, "Unable to determine client SPIFFE ID", http.StatusUnauthorized)
+		return
+	}
+	slog.Info("Received ping", "client.id", clientID.String())
 	w.WriteHeader(http.StatusOK)
-	_, err := w.Write([]byte("...pong"))
+	_, err = w.Write([]byte("...pong"))
 	if err != nil {
 		handlerErrors.Inc()
 		slog.Error("Error writing response", "error", err)
 		return
 	}
+}
+
+// getClientID returns the SPIFFE ID of the client.
+func getClientID(r *http.Request) (spiffeid.ID, error) {
+	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		return spiffeid.ID{}, fmt.Errorf("no peer certificates")
+	}
+	return x509svid.IDFromCert(r.TLS.PeerCertificates[0])
 }
 
 func runMetrics(env *Env, mux *http.ServeMux) {
@@ -213,7 +229,6 @@ func runMetrics(env *Env, mux *http.ServeMux) {
 		}()
 
 	}
-
 }
 
 func runMetricsUpdateWatcher(env *Env, source *workloadapi.X509Source, ctx context.Context) {
