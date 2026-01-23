@@ -148,8 +148,8 @@ func run(ctx context.Context, env *Env) error {
 	}
 
 	// Only authorize inbound calls from the expected client SPIFFE IDs
-	var clientSPIFFEIDs []spiffeid.ID
 	allowedSPIFFEIDs := strings.Split(env.ClientSPIFFEIDs, ",")
+	clientSPIFFEIDs := make([]spiffeid.ID, 0, len(allowedSPIFFEIDs))
 	for _, allowedSPIFFEID := range allowedSPIFFEIDs {
 		clientSPIFFEID, err := spiffeid.FromString(allowedSPIFFEID)
 		if err != nil {
