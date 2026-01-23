@@ -126,6 +126,7 @@ func run(ctx context.Context, env *Env) error {
 
 	runMetrics(env, mux)
 
+	slog.Info("Waiting for X.509 SVID")
 	source, err := workloadapi.NewX509Source(ctx,
 		workloadapi.WithClientOptions(
 			workloadapi.WithAddr(env.SpiffeSocketPath),
@@ -137,6 +138,7 @@ func run(ctx context.Context, env *Env) error {
 	defer func() {
 		_ = source.Close()
 	}()
+	slog.Info("Retrieved X.509 SVID")
 
 	runMetricsUpdateWatcher(env, source, ctx)
 

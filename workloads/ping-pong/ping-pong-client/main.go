@@ -127,6 +127,7 @@ func run(ctx context.Context, env *Env) error {
 	initCtx, initCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer initCancel()
 
+	slog.Info("Waiting for X.509 SVID")
 	source, err := workloadapi.NewX509Source(initCtx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
 	if err != nil {
 		return fmt.Errorf("unable to obtain SVID: %w", err)
@@ -134,6 +135,7 @@ func run(ctx context.Context, env *Env) error {
 	defer func() {
 		_ = source.Close()
 	}()
+	slog.Info("Retrieved X.509 SVID")
 
 	if env.MetricsEnabled {
 		// Expose metrics endpoint
