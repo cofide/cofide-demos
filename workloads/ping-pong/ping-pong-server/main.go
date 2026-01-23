@@ -157,6 +157,7 @@ func run(ctx context.Context, env *Env) error {
 		}
 		clientSPIFFEIDs = append(clientSPIFFEIDs, clientSPIFFEID)
 	}
+	slog.Info("Allowed client SPIFFE IDs", "spiffe_ids", clientSPIFFEIDs)
 	tlsConfig := tlsconfig.MTLSServerConfig(
 		source,
 		source,
