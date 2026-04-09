@@ -11,6 +11,8 @@ There are several flavours of `ping-pong`:
 - `workloads/ping-pong-jwt`: SPIFFE JWT-authenticated HTTP ping pong
 - `workloads/ping-pong-mesh`: HTTP ping pong (eg for use with a service mesh)
 
+The Cofide Connect [documentation](https://docs.cofide.dev/workloads/communication-patterns/) contains additional information about the zero-trust communication patterns demonstrated by the examples in this repository.
+
 ## Deploy a single trust zone Cofide instance
 
 See the [`cofidectl` docs](https://github.com/cofide/cofidectl?tab=readme-ov-file#quickstart)
