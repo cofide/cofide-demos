@@ -19,7 +19,7 @@ check-deps:
     done
     echo "All dependencies installed"
 
-build-demos: build-ping-pong build-ping-pong-mesh build-ping-pong-cofide build-aws-oidc build-ping-pong-jwt
+build-demos: build-ping-pong build-ping-pong-mesh build-ping-pong-cofide build-aws-oidc build-ping-pong-jwt build-ping-pong-exchange
 
 build-ping-pong:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/ping-pong/ping-pong-server -B -t $RELEASE_TAG
@@ -36,6 +36,9 @@ build-ping-pong-cofide:
 build-ping-pong-jwt:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/ping-pong-jwt/ping-pong-jwt-server -B -t $RELEASE_TAG
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/ping-pong-jwt/ping-pong-jwt-client -B -t $RELEASE_TAG
+
+build-ping-pong-exchange:
+  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-exchange -B -t $RELEASE_TAG
 
 build-aws-oidc:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-consumer -B -t $RELEASE_TAG
