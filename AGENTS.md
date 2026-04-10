@@ -16,6 +16,7 @@ just build-ping-pong
 just build-ping-pong-mesh
 just build-ping-pong-cofide
 just build-ping-pong-jwt
+just build-ping-pong-exchange
 just build-aws-oidc
 
 # Check required tools are installed
@@ -38,6 +39,7 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 | `ping-pong-jwt` | SPIFFE JWT-SVIDs over HTTP | Uses Bearer tokens; server returns its own SPIFFE ID |
 | `ping-pong-mesh` | Plain HTTP | No auth; intended for use behind a service mesh |
 | `ping-pong-cofide` | SPIFFE mTLS via Cofide SDK | Uses `cofide-sdk-go` for XDS service discovery |
+| `ping-pong-exchange` | JWT + OAuth 2.0 Token Exchange (RFC 8693) | Single binary; supports `client`, `server`, and `relay` modes |
 | `aws-oidc` | SPIFFE + AWS STS OIDC | Demonstrates AWS credential exchange via SPIFFE identity |
 
 ### Key Patterns
@@ -49,6 +51,8 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 **ping-pong-jwt**: Client fetches JWT-SVID from workload API and sends as `Authorization: Bearer` header. Server validates via workload API, responds with its own SPIFFE ID.
 
 **ping-pong-cofide**: Wraps mTLS with `cofide-sdk-go/http/server` and `cofide-sdk-go/http/client`. Supports XDS-based service discovery configured via environment variables.
+
+**ping-pong-exchange**: Single binary controlled by `PING_PONG_MODE` (`client`/`server`/`relay`). On startup, fetches the OIDC discovery document from `EXCHANGE_URL` to locate the token and JWKS endpoints. Clients exchange their JWT-SVID for an audience-scoped access token (RFC 8693) and send it as a `Bearer` credential. The server validates the token signature via JWKS, checks audience/subject, and optionally enforces an `act` claim for delegated (relay) tokens.
 
 ### Key Dependencies
 
