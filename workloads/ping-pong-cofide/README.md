@@ -19,6 +19,7 @@ This demonstrates the Cofide SDK's higher-level API for building SPIFFE-aware se
 |----------|----------|---------|-------------|
 | `SECURE_PORT` | No | `:8443` | mTLS listen address |
 | `INSECURE_PORT` | No | `:8080` | Plain HTTP listen address |
+| `SPIFFE_ENDPOINT_SOCKET` | No | `unix:///spiffe-workload-api/spire-agent.sock` | SPIFFE Workload API socket path |
 
 The server does not require explicit SPIFFE configuration — the Cofide SDK discovers the Workload API socket automatically via the `SPIFFE_ENDPOINT_SOCKET` environment variable or default path.
 

@@ -60,10 +60,10 @@ This creates the OIDC identity provider in IAM and the IAM role. Note the role A
 export IMAGE_TAG=latest
 export CONSUMER_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/consumer-role
 export ANALYSIS_TRUST_DOMAIN=example.org
-export ANALYSIS_SPIFFE_ID=spiffe://example.org/ns/analytics/sa/default
+export ANALYSIS_SPIFFE_ID=spiffe://%s/ns/analytics/sa/default
 export CONSUMER_TRUST_DOMAIN=example.org
 export CONSUMER_SERVER_ADDRESS=http://consumer.production:9090
-export CONSUMER_SPIFFE_ID=spiffe://example.org/ns/production/sa/default
+export CONSUMER_SPIFFE_ID=spiffe://%s/ns/production/sa/default
 export CONSUMER_SERVICE_TYPE=ClusterIP
 
 envsubst < aws-oidc-consumer/deploy.yaml | kubectl apply -f -
