@@ -12,6 +12,26 @@ Instead of TLS certificates, each side proves its identity using a JWT-SVID — 
 
 This pattern shows that cryptographic workload identity doesn't require mTLS — JWT-SVIDs can be used in any HTTP-based protocol that supports bearer tokens.
 
+```mermaid
+sequenceDiagram
+    participant WA as SPIFFE Workload API
+    participant C as Client
+    participant S as Server
+
+    C->>WA: Fetch JWT-SVID (aud: ping-pong-server)
+    WA-->>C: JWT-SVID
+    C->>S: POST /ping (Authorization: Bearer <client JWT>)
+    S->>WA: ValidateJWTSVID(token)
+    WA-->>S: Validated client SPIFFE ID
+    S->>S: Check client SPIFFE ID
+    S->>WA: Fetch JWT-SVID (aud: ping-pong-client)
+    WA-->>S: JWT-SVID
+    S-->>C: pong (Authorization: Bearer <server JWT>)
+    C->>WA: ValidateJWTSVID(token)
+    WA-->>C: Validated server SPIFFE ID
+    C->>C: Check server SPIFFE ID
+```
+
 ## Configuration
 
 ### Server

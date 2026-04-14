@@ -8,6 +8,25 @@ The client and server establish mutual TLS using X.509 SVIDs obtained from the S
 
 Both workloads expose Prometheus metrics including request counts, SVID expiry timestamps, and SVID URI SANs.
 
+```mermaid
+sequenceDiagram
+    participant WA as SPIFFE Workload API
+    participant C as Client
+    participant S as Server
+
+    C->>WA: Fetch X.509 SVID
+    WA-->>C: X.509 SVID + trust bundle
+    S->>WA: Fetch X.509 SVID
+    WA-->>S: X.509 SVID + trust bundle
+    C->>S: mTLS handshake (present SVID)
+    S->>S: Validate client SPIFFE ID
+    S-->>C: mTLS established (present SVID)
+    loop every N seconds
+        C->>S: ping
+        S-->>C: pong
+    end
+```
+
 ## Configuration
 
 ### Server

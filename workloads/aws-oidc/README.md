@@ -12,6 +12,26 @@ Optionally, the connection between the two workloads can be secured with SPIFFE 
 
 This pattern shows that SPIFFE identity can be used to authenticate to cloud provider APIs, eliminating the need to distribute long-lived AWS access keys to workloads.
 
+```mermaid
+sequenceDiagram
+    participant WA as SPIFFE Workload API
+    participant Con as Consumer
+    participant STS as AWS STS
+    participant S3 as AWS S3
+    participant Ana as Analysis
+
+    Con->>WA: Fetch JWT-SVID (OIDC token)
+    WA-->>Con: JWT-SVID
+    Con->>STS: AssumeRoleWithWebIdentity(JWT, role ARN)
+    STS-->>Con: Temporary AWS credentials
+    loop periodic
+        Ana->>Con: GET /buckets
+        Con->>S3: ListBuckets (temp credentials)
+        S3-->>Con: Bucket list
+        Con-->>Ana: Bucket list
+    end
+```
+
 ### AWS setup
 
 An OIDC identity provider must be configured in AWS IAM pointing at the SPIRE server's JWKS endpoint, and an IAM role must be created with a trust policy that allows `sts:AssumeRoleWithWebIdentity` from the workload's SPIFFE ID. Terraform configuration for this is provided in the `terraform/` directory.
