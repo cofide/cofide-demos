@@ -11,6 +11,24 @@ This variant is functionally similar to the base `ping-pong` demo — workloads 
 
 This demonstrates the Cofide SDK's higher-level API for building SPIFFE-aware services, including dynamic service discovery via xDS.
 
+```mermaid
+sequenceDiagram
+    participant XDS as XDS Server
+    participant WA as SPIFFE Workload API
+    participant C as Client (Cofide SDK)
+    participant S as Server (Cofide SDK)
+
+    C->>XDS: Discover server endpoint & TLS config
+    XDS-->>C: Route configuration
+    C->>WA: Fetch X.509 SVID
+    WA-->>C: X.509 SVID + trust bundle
+    S->>WA: Fetch X.509 SVID
+    WA-->>S: X.509 SVID + trust bundle
+    C->>S: mTLS ping (present SVID)
+    S->>S: Validate client SPIFFE ID (ns=production)
+    S-->>C: pong
+```
+
 ## Configuration
 
 ### Server

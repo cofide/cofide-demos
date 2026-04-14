@@ -8,6 +8,22 @@ The workloads themselves are plain HTTP — no SPIFFE, no TLS, no credential han
 
 This pattern shows that existing applications can gain strong workload identity without code changes, by running them inside a mesh that handles identity at the infrastructure layer.
 
+```mermaid
+sequenceDiagram
+    participant C as Client App
+    participant CS as Client Sidecar (Envoy + SPIRE)
+    participant SS as Server Sidecar (Envoy + SPIRE)
+    participant S as Server App
+
+    C->>CS: HTTP (plain)
+    CS->>SS: mTLS (X.509 SVIDs via SPIRE)
+    SS->>SS: Enforce mesh policy
+    SS->>S: HTTP (plain)
+    S-->>SS: HTTP response
+    SS-->>CS: mTLS
+    CS-->>C: HTTP response
+```
+
 ## Configuration
 
 ### Server
