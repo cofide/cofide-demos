@@ -16,11 +16,11 @@ sequenceDiagram
     participant S as Server App
 
     C->>CS: HTTP (plain)
-    CS->>SS: mTLS (X.509 SVIDs via SPIRE)
+    CS->>SS: mTLS request (X.509 SVIDs via SPIRE)
     SS->>SS: Enforce mesh policy
     SS->>S: HTTP (plain)
     S-->>SS: HTTP response
-    SS-->>CS: mTLS
+    SS-->>CS: mTLS response
     CS-->>C: HTTP response
 ```
 
