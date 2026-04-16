@@ -22,7 +22,7 @@ sequenceDiagram
 
     Con->>WA: Fetch JWT-SVID (OIDC token)
     WA-->>Con: JWT-SVID
-    Con->>STS: AssumeRoleWithWebIdentity(JWT, role ARN)
+    Con->>STS: AssumeRoleWithWebIdentity(JWT-SVID, role ARN)
     STS-->>Con: Temporary AWS credentials
     loop periodic
         Ana->>Con: GET /buckets

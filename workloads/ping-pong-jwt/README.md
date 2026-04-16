@@ -20,13 +20,13 @@ sequenceDiagram
 
     C->>WA: Fetch JWT-SVID (aud: ping-pong-server)
     WA-->>C: JWT-SVID
-    C->>S: POST /ping (Authorization: Bearer <client JWT>)
+    C->>S: POST /ping (Authorization: Bearer <client JWT-SVID>)
     S->>WA: ValidateJWTSVID(token)
     WA-->>S: Validated client SPIFFE ID
     S->>S: Check client SPIFFE ID
     S->>WA: Fetch JWT-SVID (aud: ping-pong-client)
     WA-->>S: JWT-SVID
-    S-->>C: pong (Authorization: Bearer <server JWT>)
+    S-->>C: pong (Authorization: Bearer <server JWT-SVID>)
     C->>WA: ValidateJWTSVID(token)
     WA-->>C: Validated server SPIFFE ID
     C->>C: Check server SPIFFE ID
