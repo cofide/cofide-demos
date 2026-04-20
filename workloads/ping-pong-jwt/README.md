@@ -54,7 +54,9 @@ sequenceDiagram
 ## Deployment
 
 ```bash
-export IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_PREFIX=ghcr.io/cofide/cofide-demos/
+export COFIDE_DEMOS_IMAGE_PULL_POLICY=Always
 export CLIENT_SPIFFE_ID=spiffe://example.org/ns/demo/sa/ping-pong-client
 export SERVER_SPIFFE_ID=spiffe://example.org/ns/demo/sa/ping-pong-server
 export PING_PONG_SERVER_SERVICE_HOST=ping-pong-server.demo

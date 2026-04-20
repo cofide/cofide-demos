@@ -22,3 +22,22 @@ See the [`cofidectl` docs](https://github.com/cofide/cofidectl?tab=readme-ov-fil
 ### Deploy an additional Cofide trust zone instance and federate the workloads
 
 See the [`cofidectl` docs](https://github.com/cofide/cofidectl/blob/main/docs/multi-tz-federation.md)
+
+## Local development deployment
+
+Local development uses `ko` and tags built images under `ko.local/` namespace.
+
+In all the examples, use the following values instead of `ghcr.io` ones:
+
+```
+export COFIDE_DEMOS_IMAGE_PREFIX=ko.local/
+export COFIDE_DEMOS_IMAGE_PULL_POLICY=Never
+```
+
+### Building just one arch
+
+Set `COFIDE_DEMOS_PLATFORMS` to one of the supported platforms, e.g.:
+
+```
+export COFIDE_DEMOS_PLATFORMS=linux/amd64
+```

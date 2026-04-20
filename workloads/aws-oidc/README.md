@@ -77,7 +77,9 @@ This creates the OIDC identity provider in IAM and the IAM role. Note the role A
 ### Kubernetes workloads
 
 ```bash
-export IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_PREFIX=ghcr.io/cofide/cofide-demos/
+export COFIDE_DEMOS_IMAGE_PULL_POLICY=Always
 export CONSUMER_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/consumer-role
 export ANALYSIS_TRUST_DOMAIN=example.org
 export ANALYSIS_SPIFFE_ID=spiffe://%s/ns/analytics/sa/default

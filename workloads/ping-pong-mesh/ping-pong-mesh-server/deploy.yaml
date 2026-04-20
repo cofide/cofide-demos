@@ -33,8 +33,8 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ghcr.io/cofide/cofide-demos/ping-pong-mesh-server:${IMAGE_TAG}
-        imagePullPolicy: Always
+        image: ${COFIDE_DEMOS_IMAGE_PREFIX}ping-pong-mesh-server:${COFIDE_DEMOS_IMAGE_TAG}
+        imagePullPolicy: ${COFIDE_DEMOS_IMAGE_PULL_POLICY}
         resources:
           requests:
             memory: "128Mi"

@@ -42,7 +42,9 @@ sequenceDiagram
 ## Deployment
 
 ```bash
-export IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_PREFIX=ghcr.io/cofide/cofide-demos/
+export COFIDE_DEMOS_IMAGE_PULL_POLICY=Always
 export PING_PONG_SERVER_SERVICE_HOST=ping-pong-server.demo
 export PING_PONG_SERVER_SERVICE_PORT=8443
 

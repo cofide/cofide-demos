@@ -26,8 +26,8 @@ spec:
       serviceAccountName: ping-pong-server
       containers:
       - name: ping-pong-server
-        image: ghcr.io/cofide/cofide-demos/ping-pong-cofide-server:${IMAGE_TAG}
-        imagePullPolicy: Always
+        image: ${COFIDE_DEMOS_IMAGE_PREFIX}ping-pong-cofide-server:${COFIDE_DEMOS_IMAGE_TAG}
+        imagePullPolicy: ${COFIDE_DEMOS_IMAGE_PULL_POLICY}
         resources:
           requests:
             cpu: "100m"
