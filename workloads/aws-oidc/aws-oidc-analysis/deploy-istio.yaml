@@ -36,8 +36,8 @@ spec:
       serviceAccountName: default
       containers:
         - name: analysis-container
-          image: ghcr.io/cofide/cofide-demos/aws-oidc-analysis:${IMAGE_TAG}
-          imagePullPolicy: Always
+          image: ${COFIDE_DEMOS_IMAGE_PREFIX}aws-oidc-analysis:${COFIDE_DEMOS_IMAGE_TAG}
+          imagePullPolicy: ${COFIDE_DEMOS_IMAGE_PULL_POLICY}
           resources:
             requests:
               memory: "128Mi"

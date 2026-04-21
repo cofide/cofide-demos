@@ -2,7 +2,8 @@ module github.com/cofide/cofide-demos
 
 go 1.25.7
 
-require github.com/spiffe/go-spiffe/v2 v2.6.0
+// Uncomment the following for development with local Cofide SDK changes:
+// replace github.com/cofide/cofide-sdk-go => ../cofide-sdk-go
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.6
@@ -13,6 +14,7 @@ require (
 	github.com/cofide/cofide-sdk-go v0.4.2
 	github.com/gin-gonic/gin v1.12.0
 	github.com/prometheus/client_golang v1.23.2
+	github.com/spiffe/go-spiffe/v2 v2.6.0
 )
 
 require (
