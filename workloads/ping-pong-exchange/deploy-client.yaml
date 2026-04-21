@@ -4,7 +4,7 @@ metadata:
   name: ping-pong-client
   labels:
     app: ping-pong-client
-    mode: exchange
+    type: exchange
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -15,12 +15,12 @@ spec:
   selector:
     matchLabels:
       app: ping-pong-client
-      mode: exchange
+      type: exchange
   template:
     metadata:
       labels:
         app: ping-pong-client
-        mode: exchange
+        type: exchange
     spec:
       serviceAccountName: ping-pong-client
       containers:

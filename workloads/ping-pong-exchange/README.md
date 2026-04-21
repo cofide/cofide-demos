@@ -4,7 +4,7 @@ A ping-pong demo that demonstrates cross-trust-domain workload authentication us
 
 ## What it demonstrates
 
-Instead of using mTLS directly, workloads authenticate by exchanging their SPIFFE JWT-SVID for an OAuth 2.0 access token at a central token exchange service. This allows workloads in different trust domains to authenticate to each other without requiring direct X.509 trust between the domains — only the token exchange service needs to be trusted by both sides.
+Instead of using mTLS, workloads authenticate by exchanging their SPIFFE JWT-SVID for an OAuth 2.0 access token at a central token exchange service. This allows workloads in different trust domains to authenticate to each other without requiring direct trust between the domains — only the token exchange service needs to be trusted by both sides.
 
 The demo supports three operating modes:
 

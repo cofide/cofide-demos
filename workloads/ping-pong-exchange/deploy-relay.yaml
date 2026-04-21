@@ -4,7 +4,7 @@ metadata:
   name: ping-pong-relay
   labels:
     app: ping-pong-relay
-    mode: exchange
+    type: exchange
 ---
 apiVersion: v1
 kind: Service
@@ -12,11 +12,11 @@ metadata:
   name: ping-pong-relay
   labels:
     app: ping-pong-relay
-    mode: exchange
+    type: exchange
 spec:
   selector:
     app: ping-pong-relay
-    mode: exchange
+    type: exchange
   ports:
     - name: http
       port: 8443
@@ -31,12 +31,12 @@ spec:
   selector:
     matchLabels:
       app: ping-pong-relay
-      mode: exchange
+      type: exchange
   template:
     metadata:
       labels:
         app: ping-pong-relay
-        mode: exchange
+        type: exchange
     spec:
       serviceAccountName: ping-pong-relay
       containers:
