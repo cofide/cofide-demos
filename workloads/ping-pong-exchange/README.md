@@ -106,7 +106,9 @@ KO_DOCKER_REPO=ghcr.io/cofide/cofide-demos ko build ./workloads/ping-pong-exchan
 The `deploy-*.yaml` manifests use shell-style variable substitution for environment-specific values. Substitute the variables before applying, for example with `envsubst`:
 
 ```bash
-export IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_TAG=latest
+export COFIDE_DEMOS_IMAGE_PREFIX=ghcr.io/cofide/cofide-demos/
+export COFIDE_DEMOS_IMAGE_PULL_POLICY=Always
 export EXCHANGE_URL=https://exchange.example.com
 export CLIENT_SPIFFE_ID=spiffe://trust-domain-a/ns/demo/sa/ping-pong-client
 export SERVER_SPIFFE_ID=spiffe://trust-domain-b/ns/demo/sa/ping-pong-server

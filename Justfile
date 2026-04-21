@@ -38,7 +38,7 @@ build-ping-pong-jwt:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/ping-pong-jwt/ping-pong-jwt-client -B -t $RELEASE_TAG
 
 build-ping-pong-exchange:
-  ko build --platform=linux/amd64,linux/arm64 github.com/cofide/cofide-demos/workloads/ping-pong-exchange -B -t $RELEASE_TAG
+  ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/ping-pong-exchange -B -t $RELEASE_TAG
 
 build-aws-oidc:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/aws-oidc/aws-oidc-consumer -B -t $RELEASE_TAG
