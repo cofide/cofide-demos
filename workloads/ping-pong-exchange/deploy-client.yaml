@@ -25,7 +25,8 @@ spec:
       serviceAccountName: ping-pong-client
       containers:
         - name: ping-pong-client
-          image: ghcr.io/cofide/cofide-demos/ping-pong-exchange:${IMAGE_TAG}
+          image: ${COFIDE_DEMOS_IMAGE_PREFIX}ping-pong-exchange:${COFIDE_DEMOS_IMAGE_TAG}
+          imagePullPolicy: ${COFIDE_DEMOS_IMAGE_PULL_POLICY}
           resources:
             requests:
               memory: "128Mi"
