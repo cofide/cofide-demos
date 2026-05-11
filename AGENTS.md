@@ -18,6 +18,7 @@ just build-ping-pong-cofide
 just build-ping-pong-jwt
 just build-ping-pong-exchange
 just build-aws-oidc
+just build-gcp-oidc
 
 # Check required tools are installed
 just check-deps
@@ -41,6 +42,7 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 | `ping-pong-cofide` | SPIFFE mTLS via Cofide SDK | Uses `cofide-sdk-go` for XDS service discovery |
 | `ping-pong-exchange` | JWT + OAuth 2.0 Token Exchange (RFC 8693) | Single binary; supports `client`, `server`, and `relay` modes |
 | `aws-oidc` | SPIFFE + AWS STS OIDC | Demonstrates AWS credential exchange via SPIFFE identity |
+| `gcp-oidc` | SPIFFE + GCP WIF | Demonstrates GCP Workload Identity Federation with SPIFFE |
 
 ### Key Patterns
 
@@ -60,5 +62,6 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 - `github.com/cofide/cofide-sdk-go` — Cofide HTTP wrappers, XDS integration
 - `github.com/go-jose/go-jose/v4` — JWT/JOSE operations (used in exchange variant)
 - `github.com/prometheus/client_golang` — Metrics (ping-pong only)
-- `github.com/gin-gonic/gin` — HTTP framework (aws-oidc only)
+- `github.com/gin-gonic/gin` — HTTP framework (aws-oidc and gcp-oidc only)
 - `github.com/aws/aws-sdk-go-v2` — AWS SDK (aws-oidc only)
+- `cloud.google.com/go/storage` — GCS (gcp-oidc only)
