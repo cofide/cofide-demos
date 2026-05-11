@@ -9,7 +9,7 @@ variable "workload_identity_pool_id" {
 }
 
 variable "oidc_endpoint_for_trust_zone" {
-  description = "The URL from which the OIDC discovery provider is being served without the schema (i.e., the https:// prefix)."
+  description = "The URL from which the OIDC discovery provider is being served without the scheme (i.e., the https:// prefix)."
   type        = string
 }
 
