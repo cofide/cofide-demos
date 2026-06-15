@@ -255,7 +255,7 @@ func (c *pingPongClient) doTokenExchange(ctx context.Context, svid *jwtsvid.SVID
 	exchangeResult, err := c.exchangeClient.Exchange(ctx, ExchangeParams{
 		ClientAssertionType: "urn:ietf:params:oauth:client-assertion-type:jwt-spiffe",
 		ClientAssertion:     svid.Marshal(),
-		SubjectTokenType:    "urn:ietf:params:oauth:token-type:jwt-spiffe",
+		SubjectTokenType:    "urn:ietf:params:oauth:token-type:jwt_spiffe",
 		SubjectToken:        svid.Marshal(),
 		Audience:            c.env.ServerSPIFFEID,
 	})
@@ -457,7 +457,7 @@ func (s *pingPongServer) handleRelay(w http.ResponseWriter, r *http.Request, tok
 		ClientAssertion:     svid.Marshal(),
 		SubjectTokenType:    "urn:ietf:params:oauth:token-type:access_token",
 		SubjectToken:        token,
-		ActorTokenType:      "urn:ietf:params:oauth:token-type:jwt-spiffe",
+		ActorTokenType:      "urn:ietf:params:oauth:token-type:jwt_spiffe",
 		ActorToken:          svid.Marshal(),
 		Audience:            s.env.ServerSPIFFEID,
 	})
