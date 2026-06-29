@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ledger
+  labels:
+    app: ledger
+    demo: cofide-capital
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger
+  labels:
+    app: ledger
+    demo: cofide-capital
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger
+      demo: cofide-capital
+  template:
+    metadata:
+      labels:
+        app: ledger
+        demo: cofide-capital
+    spec:
+      serviceAccountName: ledger
+      containers:
+      - name: ledger
+        image: ghcr.io/cofide/cofide-demos/cofide-capital/ledger:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+        env:
+        - name: REDIS_ADDR
+          value: redis:6379
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger
+  labels:
+    app: ledger
+    demo: cofide-capital
+spec:
+  selector:
+    app: ledger
+    demo: cofide-capital
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080

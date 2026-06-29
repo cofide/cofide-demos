@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cofide Capital</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211d;
+      --muted: #607069;
+      --line: #d9e2de;
+      --panel: #ffffff;
+      --bg: #f5f7f4;
+      --good: #14734f;
+      --bad: #b42318;
+      --accent: #1f6f8b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 { margin: 0; font-size: 20px; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(360px, 520px);
+      gap: 20px;
+      padding: 20px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    h2 { margin: 0 0 14px; font-size: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 10px 12px;
+    }
+    button.secondary { background: #58635f; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    .mode {
+      color: white;
+      background: {{if eq .Version "v2"}}var(--good){{else}}var(--bad){{end}};
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .feed {
+      display: grid;
+      gap: 8px;
+      max-height: 560px;
+      overflow: auto;
+    }
+    .event {
+      border-left: 4px solid var(--line);
+      background: #fbfcfb;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .event.good { border-left-color: var(--good); }
+    .event.bad { border-left-color: var(--bad); }
+    .event strong { display: block; margin-bottom: 3px; }
+    .event code { color: var(--muted); white-space: pre-wrap; }
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cofide Capital</h1>
+    <span class="mode">{{.Version}}</span>
+  </header>
+  <main>
+    <section>
+      <h2>Accounts</h2>
+      <table>
+        <thead>
+          <tr><th>Account</th><th>Name</th><th>Balance</th></tr>
+        </thead>
+        <tbody>
+          {{range .Accounts}}
+          <tr><td>{{.ID}}</td><td>{{.Name}}</td><td>£{{money .Balance}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+      <div class="actions">
+        <button id="send-payment">Send Payment</button>
+        <button class="secondary" id="simulate-attack">Simulate Attack</button>
+      </div>
+    </section>
+    <section>
+      <h2>Event Feed</h2>
+      <div id="feed" class="feed"></div>
+    </section>
+  </main>
+  <script>
+    const feed = document.querySelector("#feed");
+    function addEvent(event) {
+      const row = document.createElement("div");
+      const isBad = event.event_type && event.event_type.includes("ATTACK_SUCCEEDED");
+      const isGood = event.event_type && (event.event_type.includes("MTLS") || event.event_type.includes("REJECTED"));
+      row.className = "event " + (isBad ? "bad" : isGood ? "good" : "");
+      row.innerHTML = `<strong>${event.service} · ${event.event_type}</strong><code>${JSON.stringify(event.details || {}, null, 2)}</code>`;
+      feed.prepend(row);
+    }
+    new EventSource("/demo/events").onmessage = (message) => addEvent(JSON.parse(message.data));
+    async function post(path) {
+      const res = await fetch(path, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+    document.querySelector("#send-payment").onclick = async () => {
+      try { addEvent({service: "frontend", event_type: "PAYMENT_RESULT", details: await post("/payments")}); }
+      catch (err) { addEvent({service: "frontend", event_type: "ERROR", details: {error: String(err)}}); }
+    };
+    document.querySelector("#simulate-attack").onclick = async () => {
+      try { addEvent({service: "frontend", event_type: "ATTACK_RESULT", details: await post("/demo/attack")}); }
+      catch (err) { addEvent({service: "frontend", event_type: "ERROR", details: {error: String(err)}}); }
+    };
+  </script>
+</body>
+</html>

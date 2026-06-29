@@ -1,0 +1,7 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraMounts:
+  - hostPath: ${PATH_TO_HOST_DOCKER_CREDENTIALS}
+    containerPath: /var/lib/kubelet/config.json
