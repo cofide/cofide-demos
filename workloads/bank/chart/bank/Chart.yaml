@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bank
+description: Cofide bank demo — realistic 3-tier identity demo with a static-secret/SPIFFE toggle
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

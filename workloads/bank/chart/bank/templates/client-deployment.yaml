@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-client
+  labels:
+    app: bank-client
+    {{- include "bank.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank-client
+  template:
+    metadata:
+      labels:
+        app: bank-client
+        {{- include "bank.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: bank-client
+      containers:
+        - name: bank-client
+          image: {{ .Values.image.prefix }}bank-client:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.client.listenPort }}
+          env:
+            - name: AUTH_MODE
+              value: {{ .Values.authMode | quote }}
+            - name: LISTEN_ADDRESS
+              value: ":{{ .Values.client.listenPort }}"
+            - name: BANK_SERVER_SERVICE_HOST
+              value: bank-server-api
+            - name: BANK_SERVER_SERVICE_PORT
+              value: {{ .Values.server.clientApiPort | quote }}
+            {{- if eq .Values.authMode "static" }}
+            - name: STATIC_CLIENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-static-auth
+                  key: clientApiKey
+            {{- else }}
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: {{ .Values.spiffe.socketPath | quote }}
+            - name: SERVER_SPIFFE_ID
+              value: {{ required "spiffe.serverSpiffeId is required when authMode=spiffe" .Values.spiffe.serverSpiffeId | quote }}
+            {{- end }}
+          {{- if eq .Values.authMode "spiffe" }}
+          volumeMounts:
+            - name: spiffe-workload-api
+              mountPath: /spiffe-workload-api
+              readOnly: true
+          {{- end }}
+      {{- if eq .Values.authMode "spiffe" }}
+      volumes:
+        - name: spiffe-workload-api
+          csi:
+            driver: "csi.spiffe.io"
+            readOnly: true
+      {{- end }}

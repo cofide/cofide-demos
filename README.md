@@ -14,6 +14,8 @@ There are several flavours of `ping-pong`:
 - [`workloads/aws-oidc`](workloads/aws-oidc/README.md): SPIFFE JWT-SVID to AWS credential exchange via STS OIDC
 - [`workloads/gcp-oidc`](workloads/gcp-oidc/README.md): SPIFFE JWT-SVID to GCP credential exchange via WIF
 
+There is also [`workloads/bank`](workloads/bank/README.md): a more realistic bank dashboard demo (web client, ledger server, AWS Lambda webhook) with a toggle between static-secret and SPIFFE-based authentication on every hop.
+
 The Cofide Connect [documentation](https://docs.cofide.dev/workloads/communication-patterns/) contains additional information about the zero-trust communication patterns demonstrated by the examples in this repository.
 
 ## Deploy a single trust zone Cofide instance

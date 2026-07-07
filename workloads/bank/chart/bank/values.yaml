@@ -1,0 +1,49 @@
+# authMode toggles every hop in the demo between a pre-shared static secret
+# ("static", the world before Cofide Connect) and SPIFFE-issued identity
+# ("spiffe", after onboarding into Connect). Flipping it requires a
+# `helm upgrade` followed by a rollout restart, since the SPIFFE Workload API
+# socket is mounted at pod start.
+authMode: static
+
+image:
+  prefix: ko.local/
+  tag: latest
+  pullPolicy: Never
+
+# Only used when authMode is "spiffe". These must match the SPIFFE IDs
+# registered for each workload in your trust domain.
+spiffe:
+  socketPath: unix:///spiffe-workload-api/spire-agent.sock
+  serverSpiffeId: ""
+  clientSpiffeId: ""
+  lambdaSpiffeId: ""
+
+# Only used when authMode is "static". Change these before deploying to a
+# shared cluster.
+staticAuth:
+  clientApiKey: "changeme-client-key"
+  webhookApiKey: "changeme-webhook-key"
+
+server:
+  clientApiPort: 8443
+  webhookPort: 8444
+  # ClusterIP is enough for bank-client, which runs in the same cluster. The
+  # webhook needs to be reachable from bank-lambda (running in AWS), so set
+  # this to LoadBalancer (a real cloud cluster) or NodePort (a local kind
+  # cluster fronted by a tunnel — see the README) outside local port-forwards.
+  webhookServiceType: ClusterIP
+  # Only used when webhookServiceType is NodePort. Must be within the
+  # cluster's NodePort range and match whatever's tunnelled to your host
+  # (e.g. a kind extraPortMappings entry).
+  webhookNodePort: ""
+
+client:
+  listenPort: 8080
+  # ClusterIP + kubectl port-forward is enough for a local demo; set to
+  # LoadBalancer to open the dashboard directly in a browser.
+  serviceType: ClusterIP
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"

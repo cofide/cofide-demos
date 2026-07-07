@@ -43,6 +43,7 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 | `ping-pong-exchange` | JWT + OAuth 2.0 Token Exchange (RFC 8693) | Single binary; supports `client`, `server`, and `relay` modes |
 | `aws-oidc` | SPIFFE + AWS STS OIDC | Demonstrates AWS credential exchange via SPIFFE identity |
 | `gcp-oidc` | SPIFFE + GCP WIF | Demonstrates GCP Workload Identity Federation with SPIFFE |
+| `bank` | Toggle: static API key vs SPIFFE (X.509-SVID mTLS for the client↔server hop, JWT-SVID minted by Cofide Credex for the Lambda↔server hop) | Realistic 3-tier demo (web client, ledger server, AWS Lambda webhook) with a live static-secret/SPIFFE toggle; Helm chart + Terraform instead of raw manifests |
 
 ### Key Patterns
 
@@ -55,6 +56,8 @@ This repo contains demo applications showcasing [Cofide](https://www.cofide.io) 
 **ping-pong-cofide**: Wraps mTLS with `cofide-sdk-go/http/server` and `cofide-sdk-go/http/client`. Supports XDS-based service discovery configured via environment variables.
 
 **ping-pong-exchange**: Single binary controlled by `PING_PONG_MODE` (`client`/`server`/`relay`). On startup, fetches the OIDC discovery document from `EXCHANGE_URL` to locate the token and JWKS endpoints. Clients exchange their JWT-SVID for an audience-scoped access token (RFC 8693) and send it as a `Bearer` credential. The server validates the token signature via JWKS, checks audience/subject, and optionally enforces an `act` claim for delegated (relay) tokens.
+
+**bank**: Realistic 3-tier demo — `bank-client` (web dashboard), `bank-server` (in-memory ledger, two listeners), `bank-lambda` (AWS Lambda webhook) — built to resonate with non-technical audiences rather than just proving connectivity. Every hop is controlled by an `AUTH_MODE` env var (`static` or `spiffe`), always presented as `Authorization: Bearer <token>` regardless of mode so handler logic stays uniform: in `static` mode the bearer value is a pre-shared API key (constant-time compared); in `spiffe` mode it's validated as a SPIFFE credential instead (X.509-SVID mTLS for `bank-client`→`bank-server`, and a JWT-SVID for `bank-lambda`→`bank-server`, obtained by the Lambda exchanging its AWS web identity token with **Cofide Credex**). Switching modes is a `helm upgrade --set authMode=...` + rollout restart (plus a matching Terraform `auth_mode` variable for the Lambda) — not a runtime hot-reload, since the SPIFFE Workload API socket must be mounted at pod start. This is the pattern to reuse for any future demo that needs a live static-secret/SPIFFE toggle. Unlike the other demos, `bank`'s Kubernetes manifests are a Helm chart (`workloads/bank/chart/bank`) rather than raw YAML + `envsubst`, and its Lambda is provisioned via Terraform (`workloads/bank/terraform`), packaged directly from `bank-lambda/handler.py` — it is not built via `ko` or wired into `build-demos`.
 
 ### Key Dependencies
 

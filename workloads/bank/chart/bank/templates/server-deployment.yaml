@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank-server
+  labels:
+    app: bank-server
+    {{- include "bank.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank-server
+  template:
+    metadata:
+      labels:
+        app: bank-server
+        {{- include "bank.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: bank-server
+      containers:
+        - name: bank-server
+          image: {{ .Values.image.prefix }}bank-server:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.server.clientApiPort }}
+            - containerPort: {{ .Values.server.webhookPort }}
+          env:
+            - name: AUTH_MODE
+              value: {{ .Values.authMode | quote }}
+            - name: CLIENT_API_ADDRESS
+              value: ":{{ .Values.server.clientApiPort }}"
+            - name: WEBHOOK_ADDRESS
+              value: ":{{ .Values.server.webhookPort }}"
+            {{- if eq .Values.authMode "static" }}
+            - name: STATIC_CLIENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-static-auth
+                  key: clientApiKey
+            - name: STATIC_WEBHOOK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bank-static-auth
+                  key: webhookApiKey
+            {{- else }}
+            - name: SPIFFE_ENDPOINT_SOCKET
+              value: {{ .Values.spiffe.socketPath | quote }}
+            - name: CLIENT_SPIFFE_ID
+              value: {{ required "spiffe.clientSpiffeId is required when authMode=spiffe" .Values.spiffe.clientSpiffeId | quote }}
+            - name: LAMBDA_SPIFFE_ID
+              value: {{ required "spiffe.lambdaSpiffeId is required when authMode=spiffe" .Values.spiffe.lambdaSpiffeId | quote }}
+            {{- end }}
+          {{- if eq .Values.authMode "spiffe" }}
+          volumeMounts:
+            - name: spiffe-workload-api
+              mountPath: /spiffe-workload-api
+              readOnly: true
+          {{- end }}
+      {{- if eq .Values.authMode "spiffe" }}
+      volumes:
+        - name: spiffe-workload-api
+          csi:
+            driver: "csi.spiffe.io"
+            readOnly: true
+      {{- end }}
