@@ -34,17 +34,29 @@ spec:
               value: bank-server-api
             - name: BANK_SERVER_SERVICE_PORT
               value: {{ .Values.server.clientApiPort | quote }}
+            # OIDC sign-in and the bank-agent chat proxy are independent of
+            # authMode — signing in is orthogonal to the static/SPIFFE toggle.
+            # Both are optional: bank-agent's invoke URL only exists once its
+            # Terraform has been applied (which itself needs bank-server
+            # already running), so bank-client must be able to boot without
+            # them and just serve the dashboard with chat disabled.
+            - name: OIDC_DISCOVERY_URL
+              value: {{ .Values.oidc.discoveryUrl | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.oidc.clientId | quote }}
+            - name: OIDC_REDIRECT_URL
+              value: {{ .Values.oidc.redirectUrl | quote }}
+            - name: BANK_AGENT_INVOKE_URL
+              value: {{ .Values.bankAgent.invokeUrl | quote }}
             {{- if eq .Values.authMode "spiffe" }}
             - name: SPIFFE_ENDPOINT_SOCKET
               value: {{ .Values.spiffe.socketPath | quote }}
             - name: SERVER_SPIFFE_ID
               value: {{ required "spiffe.serverSpiffeId is required when authMode=spiffe" .Values.spiffe.serverSpiffeId | quote }}
             {{- end }}
-          {{- if eq .Values.authMode "static" }}
           envFrom:
             - secretRef:
                 name: bank-client-auth
-          {{- end }}
           {{- if eq .Values.authMode "spiffe" }}
           volumeMounts:
             - name: spiffe-workload-api

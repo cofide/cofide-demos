@@ -17,20 +17,53 @@ spiffe:
   serverSpiffeId: ""
   clientSpiffeId: ""
   lambdaSpiffeId: ""
+  agentSpiffeId: ""
 
 # Only used when authMode is "static". Change these before deploying to a
 # shared cluster.
 staticAuth:
   clientApiKey: "changeme-client-key"
   webhookApiKey: "changeme-webhook-key"
+  agentApiKey: "changeme-agent-key"
+
+# Cofide Credex's OIDC discovery endpoint, used by bank-server to validate
+# bank-agent's delegated tokens. Only used when authMode is "spiffe" —
+# distinct from bank-agent's own Credex integration, which is configured in
+# workloads/bank/terraform/agentcore.tf, not here.
+credex:
+  discoveryUrl: ""
+
+# OIDC sign-in, powering the dashboard's chat feature. Any OIDC-compliant
+# IdP works here (Ory, Auth0, Okta, ...) — nothing below is IdP-specific.
+# Required in both auth modes — signing in as a customer is orthogonal to
+# the static/SPIFFE toggle for the bank-client/bank-agent -> bank-server
+# hops. bank-client is registered as a public OAuth2 client (PKCE, no client
+# secret) — one less static secret to manage, consistent with the rest of
+# this demo.
+oidc:
+  discoveryUrl: ""
+  clientId: ""
+  redirectUrl: ""
+
+# bank-agent runs on AWS Bedrock AgentCore, not in this cluster — this is
+# just where bank-client sends chat questions. See workloads/bank/terraform.
+bankAgent:
+  invokeUrl: ""
+
+session:
+  # Signs bank-client's session cookie. Change before deploying to a shared
+  # cluster.
+  secret: "changeme-session-secret"
 
 server:
   clientApiPort: 8443
+  # bank-lambda and bank-agent (both running in AWS) share this listener —
+  # different routes (/webhook/transactions, /api/summary), different auth,
+  # one port to expose. ClusterIP is enough for bank-client, which runs in
+  # the same cluster and uses clientApiPort instead; set this to LoadBalancer
+  # (a real cloud cluster) or NodePort (a local kind cluster fronted by a
+  # tunnel — see the README) so bank-lambda/bank-agent can reach it.
   webhookPort: 8444
-  # ClusterIP is enough for bank-client, which runs in the same cluster. The
-  # webhook needs to be reachable from bank-lambda (running in AWS), so set
-  # this to LoadBalancer (a real cloud cluster) or NodePort (a local kind
-  # cluster fronted by a tunnel — see the README) outside local port-forwards.
   webhookServiceType: ClusterIP
   # Only used when webhookServiceType is NodePort. Must be within the
   # cluster's NodePort range and match whatever's tunnelled to your host

@@ -31,6 +31,7 @@ spec:
               value: {{ .Values.authMode | quote }}
             - name: CLIENT_API_ADDRESS
               value: ":{{ .Values.server.clientApiPort }}"
+            # Shared by bank-lambda and bank-agent — see values.yaml.
             - name: WEBHOOK_ADDRESS
               value: ":{{ .Values.server.webhookPort }}"
             {{- if eq .Values.authMode "spiffe" }}
@@ -40,6 +41,14 @@ spec:
               value: {{ required "spiffe.clientSpiffeId is required when authMode=spiffe" .Values.spiffe.clientSpiffeId | quote }}
             - name: LAMBDA_SPIFFE_ID
               value: {{ required "spiffe.lambdaSpiffeId is required when authMode=spiffe" .Values.spiffe.lambdaSpiffeId | quote }}
+            # Optional, no `required` guard: bank-agent has its own separate
+            # deployment bootstrap (see the README), so bank-server must be
+            # able to run in spiffe mode before it's configured — it just
+            # disables the agent-facing listener until both are set.
+            - name: AGENT_SPIFFE_ID
+              value: {{ .Values.spiffe.agentSpiffeId | quote }}
+            - name: CREDEX_DISCOVERY_URL
+              value: {{ .Values.credex.discoveryUrl | quote }}
             {{- end }}
           {{- if eq .Values.authMode "static" }}
           envFrom:
