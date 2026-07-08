@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/subtle"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -27,6 +28,28 @@ func staticAuthMiddleware(expectedKey string, next http.HandlerFunc) http.Handle
 			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
 			return
 		}
+		next(w, r)
+	}
+}
+
+// staticAgentAuthMiddleware authorises bank-agent's requests bearing a
+// pre-shared API key, the same as staticAuthMiddleware, but also logs the
+// caller's identity from the X-On-Behalf-Of header. Unlike the delegated
+// JWT bank-agent presents in spiffe mode, this header is asserted by
+// bank-agent, not cryptographically verified — that distinction is the
+// point of the static/spiffe toggle.
+func staticAgentAuthMiddleware(expectedKey string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := bearerToken(r)
+		if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(expectedKey)) != 1 {
+			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
+			return
+		}
+		onBehalfOf := r.Header.Get("X-On-Behalf-Of")
+		if onBehalfOf == "" {
+			onBehalfOf = "unknown"
+		}
+		slog.Info("Authorised bank-agent request", "on_behalf_of_asserted", onBehalfOf)
 		next(w, r)
 	}
 }
