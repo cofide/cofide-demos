@@ -33,18 +33,7 @@ spec:
               value: ":{{ .Values.server.clientApiPort }}"
             - name: WEBHOOK_ADDRESS
               value: ":{{ .Values.server.webhookPort }}"
-            {{- if eq .Values.authMode "static" }}
-            - name: STATIC_CLIENT_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: bank-static-auth
-                  key: clientApiKey
-            - name: STATIC_WEBHOOK_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: bank-static-auth
-                  key: webhookApiKey
-            {{- else }}
+            {{- if eq .Values.authMode "spiffe" }}
             - name: SPIFFE_ENDPOINT_SOCKET
               value: {{ .Values.spiffe.socketPath | quote }}
             - name: CLIENT_SPIFFE_ID
@@ -52,6 +41,11 @@ spec:
             - name: LAMBDA_SPIFFE_ID
               value: {{ required "spiffe.lambdaSpiffeId is required when authMode=spiffe" .Values.spiffe.lambdaSpiffeId | quote }}
             {{- end }}
+          {{- if eq .Values.authMode "static" }}
+          envFrom:
+            - secretRef:
+                name: bank-server-auth
+          {{- end }}
           {{- if eq .Values.authMode "spiffe" }}
           volumeMounts:
             - name: spiffe-workload-api
