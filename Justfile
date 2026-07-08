@@ -51,3 +51,9 @@ build-gcp-oidc:
 build-bank:
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/bank/bank-server -B -t $RELEASE_TAG
   ko build --platform=$COFIDE_DEMOS_PLATFORMS github.com/cofide/cofide-demos/workloads/bank/bank-client -B -t $RELEASE_TAG
+
+# Not part of build-demos/build-bank: bank-agent targets AWS Bedrock
+# AgentCore, so it's a container pushed to ECR, not a ko/kubectl workload —
+# see workloads/bank/scripts/build-bank-agent.sh --help for options.
+build-bank-agent:
+  workloads/bank/scripts/build-bank-agent.sh --tag $RELEASE_TAG
