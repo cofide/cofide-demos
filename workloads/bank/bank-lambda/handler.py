@@ -52,6 +52,7 @@ def _post_transaction(webhook_url, transaction, token):
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            "User-Agent": "cofide-bank-demo-lambda/1.0",
         },
         method="POST",
     )
