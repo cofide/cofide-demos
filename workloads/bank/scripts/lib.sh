@@ -16,6 +16,15 @@ resolve_terraform_dir() {
   echo "${script_dir}/../terraform"
 }
 
+# resolve_bootstrap_dir echoes the path to the bank-agent ECR bootstrap
+# module — a separate root module/state from resolve_terraform_dir, see
+# terraform/bootstrap/main.tf for why.
+resolve_bootstrap_dir() {
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  echo "${script_dir}/../terraform/bootstrap"
+}
+
 # detect_webhook_url tries to work out a URL for bank-server-webhook that's
 # reachable from AWS: a LoadBalancer hostname/IP if one has been assigned,
 # falling back to the ClusterIP (which will only actually be reachable from
@@ -40,6 +49,15 @@ detect_webhook_url() {
   [[ -n "$host" ]] || return 1
 
   echo "http://${host}:${port}/webhook/transactions"
+}
+
+# agent_api_url_from_webhook_url derives bank-agent's URL from
+# detect_webhook_url's result — bank-lambda and bank-agent share a single
+# listener/Service (see chart/bank/templates/server-service.yaml), just
+# different routes, so there's no separate Service to detect.
+agent_api_url_from_webhook_url() {
+  local webhook_url="$1"
+  echo "${webhook_url%/webhook/transactions}/api/summary"
 }
 
 require() {
