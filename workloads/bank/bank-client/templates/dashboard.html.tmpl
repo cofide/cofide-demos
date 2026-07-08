@@ -62,16 +62,39 @@
     .amount.positive { color: #0b5a2e; }
     .amount.negative { color: #1a1a2e; }
     footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 20px; }
+    .header-right { display: flex; align-items: center; gap: 14px; }
+    .auth-link { color: #cdd3f7; font-size: 13px; text-decoration: none; }
+    .auth-link:hover { text-decoration: underline; }
+    .chat-card h2 { font-size: 15px; margin: 0 0 14px; }
+    .chat-log { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; max-height: 260px; overflow-y: auto; }
+    .chat-msg { padding: 10px 14px; border-radius: 10px; font-size: 14px; max-width: 85%; }
+    .chat-msg.user { align-self: flex-end; background: #10163a; color: #fff; }
+    .chat-msg.agent { align-self: flex-start; background: #f0f1f5; color: #1a1a2e; }
+    .chat-form { display: flex; gap: 8px; }
+    .chat-form input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; }
+    .chat-form button { padding: 10px 18px; border-radius: 8px; border: none; background: #10163a; color: #fff; font-weight: 600; cursor: pointer; }
+    .chat-hint { color: #9ca3af; font-size: 12px; margin: 0 0 14px; }
+    .chat-thinking { font-style: italic; color: #9ca3af; font-size: 12px; margin: 0 0 6px; }
   </style>
 </head>
 <body>
   <header>
     <span class="brand">Cofide Bank</span>
-    {{ if eq .AuthMode "spiffe" }}
-      <span class="badge badge-spiffe">Connected via SPIFFE</span>
-    {{ else }}
-      <span class="badge badge-static">Connected via static secret</span>
-    {{ end }}
+    <div class="header-right">
+      {{ if eq .AuthMode "spiffe" }}
+        <span class="badge badge-spiffe">Connected via SPIFFE</span>
+      {{ else }}
+        <span class="badge badge-static">Connected via static secret</span>
+      {{ end }}
+      {{ if .ChatEnabled }}
+        {{ if .LoggedIn }}
+          <span class="auth-link">{{ .UserName }}</span>
+          <a class="auth-link" href="/logout">Sign out</a>
+        {{ else }}
+          <a class="auth-link" href="/login">Sign in</a>
+        {{ end }}
+      {{ end }}
+    </div>
   </header>
   <main>
     {{ if .Error }}
@@ -106,8 +129,72 @@
           </tbody>
         </table>
       </div>
+      {{ if .LoggedIn }}
+      <div class="card chat-card">
+        <h2>Ask the spending assistant</h2>
+        <p class="chat-hint">Answered by bank-agent, running on AWS Bedrock AgentCore.</p>
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" placeholder="e.g. How much did I spend on groceries?" autocomplete="off" required>
+          <button type="submit">Ask</button>
+        </form>
+      </div>
+      {{ end }}
     {{ end }}
   </main>
   <footer>Reload this page to see new transactions after invoking bank-lambda.</footer>
+  {{ if .LoggedIn }}
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('chat-input');
+    const log = document.getElementById('chat-log');
+
+    function addMessage(role, text) {
+      const el = document.createElement('div');
+      el.className = 'chat-msg ' + role;
+
+      // bank-agent sometimes prefaces its answer with a <thinking>...</thinking>
+      // block — render it as a distinct, muted line instead of showing the raw
+      // tags. Built with textContent, not innerHTML, since this text originates
+      // from the LLM and must never be parsed as HTML.
+      const match = role === 'agent' && text.match(/^\s*<thinking>([\s\S]*?)<\/thinking>\s*([\s\S]*)$/i);
+      if (match) {
+        const thinking = document.createElement('div');
+        thinking.className = 'chat-thinking';
+        thinking.textContent = match[1].trim();
+        el.appendChild(thinking);
+
+        const answer = document.createElement('div');
+        answer.textContent = match[2].trim();
+        el.appendChild(answer);
+      } else {
+        el.textContent = text;
+      }
+
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
+      addMessage('user', question);
+      input.value = '';
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+        const data = await res.json();
+        addMessage('agent', res.ok ? data.answer : 'Sorry, something went wrong: ' + (data.error || res.status));
+      } catch (err) {
+        addMessage('agent', 'Sorry, something went wrong reaching the assistant.');
+      }
+    });
+  </script>
+  {{ end }}
 </body>
 </html>

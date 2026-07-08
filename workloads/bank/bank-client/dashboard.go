@@ -13,6 +13,9 @@ type dashboardView struct {
 	BalanceGBP   string
 	Transactions []transactionView
 	Error        string
+	LoggedIn     bool
+	UserName     string
+	ChatEnabled  bool
 }
 
 type transactionView struct {
@@ -23,22 +26,37 @@ type transactionView struct {
 	Positive  bool
 }
 
-func handleDashboard(fetcher *summaryFetcher, tmpl *template.Template, authMode string) http.HandlerFunc {
+func handleDashboard(fetcher *summaryFetcher, tmpl *template.Template, authMode string, sessions *sessionStore, chatEnabled bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var loggedIn bool
+		var userName string
+		if chatEnabled {
+			if sess, err := sessions.fromRequest(r); err == nil {
+				loggedIn = true
+				userName = sess.Name
+				if userName == "" {
+					userName = sess.Subject
+				}
+			}
+		}
+
 		summary, err := fetcher.fetch(r.Context())
 		if err != nil {
 			slog.Error("Failed to fetch summary from bank-server", "error", err)
 			w.WriteHeader(http.StatusBadGateway)
-			if execErr := tmpl.Execute(w, dashboardView{AuthMode: authMode, Error: "Unable to reach bank-server. Please try again."}); execErr != nil {
+			if execErr := tmpl.Execute(w, dashboardView{AuthMode: authMode, Error: "Unable to reach bank-server. Please try again.", LoggedIn: loggedIn, UserName: userName, ChatEnabled: chatEnabled}); execErr != nil {
 				slog.Error("Error rendering dashboard error state", "error", execErr)
 			}
 			return
 		}
 
 		view := dashboardView{
-			AuthMode:   authMode,
-			Account:    summary.Account,
-			BalanceGBP: formatMoney(summary.BalancePence),
+			AuthMode:    authMode,
+			Account:     summary.Account,
+			BalanceGBP:  formatMoney(summary.BalancePence),
+			LoggedIn:    loggedIn,
+			UserName:    userName,
+			ChatEnabled: chatEnabled,
 		}
 		for i := len(summary.Transactions) - 1; i >= 0; i-- {
 			txn := summary.Transactions[i]
