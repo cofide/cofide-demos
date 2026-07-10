@@ -130,14 +130,37 @@ resource "aws_iam_role_policy" "bank_agent_obo_exchange" {
   })
 }
 
+# GetResourceOauth2Token itself calls sts:GetWebIdentityToken under the hood,
+# using this execution role, to generate the AWS_IAM_ID_TOKEN_JWT assertion it
+# presents to Credex as client authentication — mirrors
+# bank_lambda_web_identity_token in iam.tf, which grants the same action for
+# bank-lambda's own (hand-rolled) exchange.
+resource "aws_iam_role_policy" "bank_agent_web_identity_token" {
+  count = var.auth_mode == "spiffe" ? 1 : 0
+
+  name = "${var.bank_agent_ecr_repository_name}-sts-web-identity-token"
+  role = aws_iam_role.bank_agent.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sts:GetWebIdentityToken"]
+      Resource = "*"
+    }]
+  })
+}
+
 # --- Credex Credential Provider (spiffe mode only) ---
 #
 # Registers Credex as an OAuth2 Credential Provider so AgentCore Identity's
 # On-Behalf-Of token exchange can broker delegated tokens on bank-agent's
 # behalf — see workloads/bank/docs/agentcore-identity.md for the mechanics.
 #
-# Client authentication (client_authentication_method = AWS_IAM_ID_TOKEN_JWT
-# below) uses Credex's RFC 7523 jwt-bearer path (exchange/oauth/authserver/
+# Client authentication is fixed to AWS_IAM_ID_TOKEN_JWT (not a variable —
+# CLIENT_SECRET_BASIC/CLIENT_SECRET_POST support was removed once this path
+# was confirmed to work; see git history if that ever needs resurrecting).
+# It uses Credex's RFC 7523 jwt-bearer path (exchange/oauth/authserver/
 # client_auth.go), which validates the AWS-issued token against a
 # trusted-issuer JWKS resolver rather than requiring a SPIFFE SVID — but this
 # still requires Credex to have this AWS account's web-identity-federation
@@ -153,47 +176,53 @@ resource "aws_iam_role_policy" "bank_agent_obo_exchange" {
 # "access_token" path.
 #
 # terraform-provider-aws 6.53.0 (the latest available at the time this was
-# written) doesn't yet expose two fields this integration needs —
-# client_authentication_method and on_behalf_of_token_exchange_config —
+# written) doesn't expose client_authentication_method or
+# on_behalf_of_token_exchange_config on custom_oauth2_provider_config —
 # confirmed by inspecting `terraform providers schema -json`, not assumed.
-# The base resource manages what the provider *does* support; the
-# null_resource below layers on the missing fields with a direct AWS CLI
-# call to the same underlying API, as a stopgap until the provider catches
-# up. Re-check the provider's CHANGELOG before removing this workaround.
-resource "aws_bedrockagentcore_oauth2_credential_provider" "credex" {
-  count = var.auth_mode == "spiffe" ? 1 : 0
-
-  name                       = "credex-provider"
-  credential_provider_vendor = "CustomOauth2"
-
-  oauth2_provider_config {
-    custom_oauth2_provider_config {
-      client_secret = var.credex_client_secret
-
-      oauth_discovery {
-        discovery_url = var.credex_discovery_url
-      }
-    }
-  }
-}
-
+# Managed entirely via a direct AWS CLI call (create-or-update) rather than
+# the aws_bedrockagentcore_oauth2_credential_provider resource: that
+# resource's CreateOauth2CredentialProvider call never sets
+# clientAuthenticationMethod (the field it doesn't expose), so AWS defaults
+# it to CLIENT_SECRET_BASIC — which then requires a client_id we
+# deliberately don't have, and fails at creation with "clientId is required
+# for CLIENT_SECRET_BASIC and CLIENT_SECRET_POST authentication methods."
+# The underlying CreateOauth2CredentialProvider/UpdateOauth2CredentialProvider
+# API does support clientAuthenticationMethod (and
+# onBehalfOfTokenExchangeConfig) directly — see AWS's
+# CustomOauth2ProviderConfigInput reference — so once the Terraform
+# resource's schema catches up, this can become a normal resource again.
+# Re-check the provider's CHANGELOG before removing this workaround.
 locals {
-  # The fields terraform-provider-aws doesn't yet expose (see comment
-  # above), sent via a direct AWS CLI call instead.
+  credex_provider_name = "credex-provider"
+
+  # AWS's Credential Provider requires an authorization_endpoint, but Credex
+  # (a pure RFC 8693 token-exchange service, not a full OAuth2 AS) doesn't
+  # have one — using oauthDiscovery.discoveryUrl against Credex's actual
+  # discovery document (which omits authorization_endpoint entirely) fails
+  # with "Credential Provider with no Authorization Endpoint information".
+  # authorizationServerMetadata lets us supply the endpoints directly instead
+  # of relying on discovery; authorizationEndpoint is set to Credex's token
+  # endpoint since there's no separate one and this OBO flow never actually
+  # redirects a user there.
+  credex_issuer         = trimsuffix(var.credex_discovery_url, "/.well-known/openid-configuration")
+  credex_token_endpoint = "${local.credex_issuer}/token"
+
   credex_obo_config_json = jsonencode({
     customOauth2ProviderConfig = {
       oauthDiscovery = {
-        discoveryUrl = var.credex_discovery_url
+        authorizationServerMetadata = {
+          issuer                = local.credex_issuer
+          authorizationEndpoint = local.credex_token_endpoint
+          tokenEndpoint         = local.credex_token_endpoint
+        }
       }
-      clientSecret               = var.credex_client_secret
-      clientAuthenticationMethod = var.credex_client_authentication_method
+      clientAuthenticationMethod = "AWS_IAM_ID_TOKEN_JWT"
       onBehalfOfTokenExchangeConfig = {
         grantType = "TOKEN_EXCHANGE"
         tokenExchangeGrantTypeConfig = {
           # Not AWS_IAM_ID_TOKEN_JWT: Credex only accepts "access_token" or
-          # "jwt_spiffe" as actor_token_type (see comment above the
-          # aws_bedrockagentcore_oauth2_credential_provider resource). M2M
-          # has AgentCore fetch a Credex-issued access token via
+          # "jwt_spiffe" as actor_token_type (see comment above). M2M has
+          # AgentCore fetch a Credex-issued access token via
           # client-credentials first, landing on the "access_token" path.
           actorTokenContent = "M2M"
         }
@@ -206,20 +235,56 @@ resource "null_resource" "credex_obo_config" {
   count = var.auth_mode == "spiffe" ? 1 : 0
 
   triggers = {
-    discovery_url                = var.credex_discovery_url
-    client_authentication_method = var.credex_client_authentication_method
+    # Hash the whole payload, not just var.credex_discovery_url: the payload's
+    # *structure* (e.g. discoveryUrl vs. authorizationServerMetadata) can
+    # change without that variable changing, and triggers are the only thing
+    # that makes Terraform re-run local-exec — otherwise "terraform apply"
+    # reports "No changes" and the stale config silently stays live in AWS.
+    config_hash = sha256(local.credex_obo_config_json)
+    # Destroy-time provisioners may only reference self.* (Terraform can't
+    # guarantee other resources/locals still exist at that point), so the
+    # provider name has to be captured here too, not just read from
+    # local.credex_provider_name directly in the destroy provisioner below.
+    provider_name = local.credex_provider_name
   }
 
+  # create-or-update, not just update: this resource is the sole owner of
+  # the Credex credential provider's lifecycle now (see comment above), so
+  # the first apply must create it, and only later applies (where triggers
+  # changed, destroying and recreating this null_resource) should update an
+  # already-existing one.
   provisioner "local-exec" {
+    # local-exec runs via /bin/sh (not necessarily bash — e.g. dash on
+    # Debian/Ubuntu), so this can't rely on bash-only options like
+    # `pipefail`. Not needed anyway: nothing here pipes commands together.
     command = <<-EOT
-      aws bedrock-agentcore-control update-oauth2-credential-provider \
-        --name ${aws_bedrockagentcore_oauth2_credential_provider.credex[0].name} \
-        --credential-provider-vendor CustomOauth2 \
-        --oauth2-provider-config-input ${jsonencode(local.credex_obo_config_json)}
+      set -eu
+      if aws bedrock-agentcore-control get-oauth2-credential-provider --name ${local.credex_provider_name} >/dev/null 2>&1; then
+        aws bedrock-agentcore-control update-oauth2-credential-provider \
+          --name ${local.credex_provider_name} \
+          --credential-provider-vendor CustomOauth2 \
+          --oauth2-provider-config-input ${jsonencode(local.credex_obo_config_json)}
+      else
+        aws bedrock-agentcore-control create-oauth2-credential-provider \
+          --name ${local.credex_provider_name} \
+          --credential-provider-vendor CustomOauth2 \
+          --oauth2-provider-config-input ${jsonencode(local.credex_obo_config_json)}
+      fi
     EOT
   }
 
-  depends_on = [aws_bedrockagentcore_oauth2_credential_provider.credex]
+  # Runs whenever this null_resource is destroyed — auth_mode flipping back
+  # to "static" (count 1 -> 0), a real `terraform destroy`, or this resource
+  # being replaced because triggers changed (destroy-then-recreate) — so the
+  # AWS-side credential provider doesn't outlive the Terraform resource that
+  # (as of the comment above) is meant to be its sole owner. Tolerates the
+  # provider already being gone (e.g. it was never successfully created, or
+  # was already cleaned up), so a redundant/failed cleanup never blocks the
+  # rest of the apply/destroy from completing.
+  provisioner "local-exec" {
+    when    = destroy
+    command = "aws bedrock-agentcore-control delete-oauth2-credential-provider --name ${self.triggers.provider_name} || true"
+  }
 }
 
 # --- Agent Runtime ---
@@ -248,6 +313,16 @@ resource "aws_bedrockagentcore_agent_runtime" "bank_agent" {
     }
   }
 
+  # Configuring custom_jwt_authorizer above only validates the Authorization
+  # header — it does NOT forward it to context.request_headers in agent.py.
+  # That's a separate, required opt-in (confirmed via AWS's "Pass custom
+  # headers to Amazon Bedrock AgentCore Runtime" doc): without this,
+  # agent.py sees only a small set of always-forwarded headers (e.g.
+  # baggage, workloadAccessToken) and on_behalf_of is always "unknown".
+  request_header_configuration {
+    request_header_allowlist = ["Authorization"]
+  }
+
   environment_variables = merge(
     {
       AUTH_MODE               = var.auth_mode
@@ -255,9 +330,16 @@ resource "aws_bedrockagentcore_agent_runtime" "bank_agent" {
       BEDROCK_MODEL_ID        = var.bedrock_model_id
     },
     var.auth_mode == "spiffe" ? {
-      CREDEX_PROVIDER_NAME = aws_bedrockagentcore_oauth2_credential_provider.credex[0].name
+      CREDEX_PROVIDER_NAME = local.credex_provider_name
+      CREDEX_OBO_SCOPES    = join(",", var.credex_obo_scopes)
       } : {
       STATIC_AGENT_API_KEY = var.static_agent_api_key
     },
   )
+
+  # CREDEX_PROVIDER_NAME above is a plain string literal (local.credex_provider_name),
+  # not a resource attribute reference, so Terraform can't infer that the
+  # Credex credential provider must exist before this Runtime references its
+  # name — depend on it explicitly instead.
+  depends_on = [null_resource.credex_obo_config]
 }

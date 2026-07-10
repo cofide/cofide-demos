@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +16,24 @@ import (
 const jwksTTL = 5 * time.Minute
 
 var allowedSignatureAlgs = []jose.SignatureAlgorithm{jose.RS256, jose.RS384, jose.RS512, jose.PS256, jose.PS384, jose.PS512, jose.ES256, jose.ES384, jose.ES512}
+
+// userAgentTransport wraps an http.RoundTripper to set a custom User-Agent on
+// every outgoing request. A nil rt uses http.DefaultTransport, matching
+// http.Client's own zero-value behavior.
+type userAgentTransport struct {
+	rt        http.RoundTripper
+	userAgent string
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.Header.Set("User-Agent", t.userAgent)
+	rt := t.rt
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	return rt.RoundTrip(req)
+}
 
 // JWKSFetcher fetches and caches a JSON Web Key Set from a remote URL,
 // refreshing it after jwksTTL has elapsed.
@@ -71,10 +88,14 @@ func (f *JWKSFetcher) fetch() (*jose.JSONWebKeySet, error) {
 
 // discoverJWKSURI fetches the jwks_uri from an OIDC discovery document, the
 // same way workloads/ping-pong-exchange discovers Credex's token/JWKS
-// endpoints.
-func discoverJWKSURI(issuerURL string, client *http.Client) (string, error) {
-	discoveryURL := strings.TrimRight(issuerURL, "/") + "/.well-known/openid-configuration"
-
+// endpoints. discoveryURL must be the full discovery document URL (ending in
+// /.well-known/openid-configuration), not just the issuer — this matches
+// AWS's own AgentCore Credential Provider, which requires the same full,
+// suffixed form for its discovery_url (enforced server-side by a regex), so
+// terraform/agentcore.tf's credex_discovery_url is already shaped this way
+// for that consumer; this function must not append the suffix itself on
+// top of that.
+func discoverJWKSURI(discoveryURL string, client *http.Client) (string, error) {
 	resp, err := client.Get(discoveryURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch OIDC discovery document: %w", err)

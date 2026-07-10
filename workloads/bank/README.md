@@ -122,7 +122,7 @@ OIDC sign-in and the `bank-agent` chat proxy are independent of `AUTH_MODE` — 
 | `BANK_SERVER_WEBHOOK_URL` | Yes | — | Full URL of `bank-server`'s webhook, reachable from AWS |
 | `STATIC_WEBHOOK_API_KEY` | If `static` | — | Bearer key sent to `bank-server` |
 | `TOKEN_EXCHANGE_URL` | If `spiffe` | — | Cofide Credex token exchange endpoint |
-| `CREDEX_AUDIENCE` | No | `cofide-credex` | Audience requested on the AWS web identity token |
+| `CREDEX_AUDIENCE` | No | `bank-server-webhook` | Audience requested on the AWS web identity token — Credex's bespoke exchange mints the resulting JWT-SVID's audience as a pass-through of this value, so it must match bank-server's `webhookAudience` constant |
 
 Invoke manually to simulate a new transaction:
 
@@ -289,7 +289,7 @@ helm upgrade bank ./chart/bank \
   --set spiffe.clientSpiffeId=spiffe://<trust-domain>/bank/client \
   --set spiffe.lambdaSpiffeId=spiffe://<trust-domain>/bank/lambda \
   --set spiffe.agentAuthorizedActor="$(terraform -chdir=terraform output -raw bank_agent_execution_role_arn)" \
-  --set credex.discoveryUrl=<cofide-credex-oidc-discovery-url>
+  --set credex.discoveryUrl=<cofide-credex-oidc-discovery-url, full form ending in /.well-known/openid-configuration>
 
 kubectl -n bank rollout restart deployment/bank-server deployment/bank-client
 
@@ -301,8 +301,7 @@ terraform apply \
   -var bank_server_agent_api_url=http://<bank-server-webhook-address>:8444/api/summary \
   -var oidc_discovery_url="$(terraform -chdir=bootstrap output -raw oidc_discovery_url)" \
   -var "oidc_allowed_clients=[\"$(terraform -chdir=bootstrap output -raw oidc_client_id)\"]" \
-  -var credex_discovery_url=<cofide-credex-oidc-discovery-url> \
-  -var credex_client_secret=<credex-client-secret>
+  -var credex_discovery_url=<cofide-credex-oidc-discovery-url, full form ending in /.well-known/openid-configuration>
 ```
 
-Invoke `bank-lambda` again and reload the dashboard — the header badge flips from "Connected via static secret" to "Connected via SPIFFE". `docs/agentcore-identity.md`'s "Risks" section covers what's unconfirmed about the `credex_discovery_url`/`credex_client_*` integration.
+Invoke `bank-lambda` again and reload the dashboard — the header badge flips from "Connected via static secret" to "Connected via SPIFFE". See `docs/agentcore-identity.md` for the mechanics of `bank-agent`'s Credex integration.

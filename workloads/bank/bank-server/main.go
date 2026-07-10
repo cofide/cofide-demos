@@ -186,7 +186,11 @@ func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler htt
 	// workloads/bank/README.md) — don't register this route, or discover
 	// Credex's JWKS endpoint, until it's configured.
 	if env.AgentAuthorizedActor != "" && env.CredexDiscoveryURL != "" {
-		httpClient := &http.Client{Timeout: 10 * time.Second}
+		// Custom User-Agent: Credex's OIDC discovery/JWKS endpoints in this
+		// demo are fronted by a Cloudflare tunnel, which blocks Go's default
+		// "Go-http-client/1.1" User-Agent (masked as a 404, not a 403) — the
+		// same issue already hit and fixed for bank-lambda's Python client.
+		httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &userAgentTransport{userAgent: "cofide-bank-server/1.0"}}
 		slog.Info("Discovering Credex JWKS endpoint", "issuer", env.CredexDiscoveryURL)
 		jwksURI, err := discoverJWKSURI(env.CredexDiscoveryURL, httpClient)
 		if err != nil {

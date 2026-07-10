@@ -88,26 +88,14 @@ variable "credex_discovery_url" {
   default     = ""
 }
 
-variable "credex_client_secret" {
-  description = "OAuth2 client secret bank-agent's Credential Provider uses to authenticate to Credex. Only used when credex_client_authentication_method = \"CLIENT_SECRET_BASIC\" or \"CLIENT_SECRET_POST\"."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "credex_client_authentication_method" {
-  description = "How bank-agent authenticates itself as an OAuth2 client to Credex's token endpoint. \"AWS_IAM_ID_TOKEN_JWT\" (the default) uses an AWS-issued identity token in place of a shared client secret — the more thoroughly AWS-native option, but not yet confirmed as supported by Credex; fall back to \"CLIENT_SECRET_BASIC\" if it isn't. See workloads/bank/docs/agentcore-identity.md."
-  type        = string
-  default     = "AWS_IAM_ID_TOKEN_JWT"
-
-  validation {
-    condition     = contains(["AWS_IAM_ID_TOKEN_JWT", "CLIENT_SECRET_BASIC", "CLIENT_SECRET_POST"], var.credex_client_authentication_method)
-    error_message = "credex_client_authentication_method must be one of AWS_IAM_ID_TOKEN_JWT, CLIENT_SECRET_BASIC, CLIENT_SECRET_POST."
-  }
-}
-
 variable "credex_audience" {
-  description = "Audience claim requested on the AWS web identity token presented to Credex."
+  description = "Audience claim requested on the AWS web identity token presented to Credex for bank-lambda's exchange. Confirmed against Credex's source (exchange/exchange/oidc/oidc.go): its bespoke InboundToken endpoint mints the outbound JWT-SVID's audience as a literal pass-through of whatever audience was on the inbound token (there's no separate target-audience concept, per that file's own TODO) — so this value must match what bank-server's webhook listener actually expects (the hardcoded webhookAudience constant in bank-server/main.go), not just \"an audience identifying Credex\"."
   type        = string
-  default     = "cofide-credex"
+  default     = "bank-server-webhook"
+}
+
+variable "credex_obo_scopes" {
+  description = "OAuth scopes bank-agent requests in AgentCore Identity's GetResourceOauth2Token call for the On-Behalf-Of exchange — a required, non-empty parameter of that API. bank-server's own delegated-token validation doesn't check scope at all, so the only thing that actually depends on this is whatever Credex's own policy for this exchange expects (RequestedScopes/outbound_scopes) — adjust if that policy expects something other than \"summary:read\"."
+  type        = list(string)
+  default     = ["summary:read"]
 }

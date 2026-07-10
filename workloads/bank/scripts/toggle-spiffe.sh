@@ -20,15 +20,17 @@ SERVER_SPIFFE_ID=""
 CLIENT_SPIFFE_ID=""
 LAMBDA_SPIFFE_ID=""
 CREDEX_URL=""
-CREDEX_AUDIENCE="cofide-credex"
+CREDEX_AUDIENCE="bank-server-webhook"
 CREDEX_DISCOVERY_URL=""
-CREDEX_CLIENT_SECRET=""
-CREDEX_CLIENT_AUTHENTICATION_METHOD="AWS_IAM_ID_TOKEN_JWT"
 AWS_REGION=""
 FUNCTION_NAME="cofide-bank-demo-lambda"
 WEBHOOK_URL=""
+IMAGE_PREFIX="ko.local/"
+IMAGE_TAG="latest"
+KIND_CLUSTER=""
 SKIP_HELM=0
 SKIP_TERRAFORM=0
+SKIP_KIND_LOAD=0
 
 usage() {
   cat <<EOF
@@ -58,22 +60,33 @@ Options:
   --chart-dir <path>        Helm chart path (default: ${CHART_DIR})
   --terraform-dir <path>    Terraform config path (default: ${TERRAFORM_DIR})
   --bootstrap-dir <path>    terraform/bootstrap module path (default: ${BOOTSTRAP_DIR})
-  --credex-audience <aud>   Audience requested on the AWS web identity token (default: ${CREDEX_AUDIENCE})
+  --credex-audience <aud>   Audience requested on the AWS web identity token for bank-lambda's exchange
+                             (default: ${CREDEX_AUDIENCE}) — Credex's bespoke exchange mints the
+                             resulting JWT-SVID's audience as a pass-through of this value, so it must
+                             match bank-server's webhookAudience constant, not just identify Credex
   --function-name <name>    Lambda function name (default: ${FUNCTION_NAME})
   --webhook-url <url>       bank-server webhook URL for the Lambda and bank-agent (they share this one
                              Service/port); auto-detected from the bank-server-webhook Service if omitted
   --credex-discovery-url <url>
                              Cofide Credex OIDC discovery endpoint for bank-agent's On-Behalf-Of token
-                             exchange Credential Provider (defaults to --credex-url if omitted — pass
-                             explicitly if Credex exposes a different endpoint for this than for
-                             bank-lambda's bespoke exchange, see workloads/bank/docs/agentcore-identity.md)
-  --credex-client-secret <s>
-                             OAuth2 client secret, only used if --credex-client-auth-method isn't
-                             AWS_IAM_ID_TOKEN_JWT
-  --credex-client-auth-method <m>
-                             How bank-agent authenticates to Credex (default: AWS_IAM_ID_TOKEN_JWT)
+                             exchange Credential Provider — must be the full discovery document URL
+                             (ending in /.well-known/openid-configuration), since AWS's AgentCore
+                             Credential Provider requires exactly that suffixed form. Defaults to
+                             --credex-url with that suffix appended if omitted — pass this explicitly
+                             if Credex exposes a different endpoint for this than for bank-lambda's
+                             bespoke exchange, see workloads/bank/docs/agentcore-identity.md
+  --image-prefix <prefix>   Image prefix (default: ${IMAGE_PREFIX}) — must match whatever
+                             deploy-static.sh/just build-bank used, so a rebuilt image is actually
+                             found under this reference
+  --image-tag <tag>         Image tag (default: ${IMAGE_TAG})
+  --kind-cluster <name>     Load freshly-built images into this kind cluster before restarting;
+                             auto-detected from the current kubectl context (kind-<name>) if omitted.
+                             Only applies when --image-prefix is ko.local/ — without this, a rebuilt
+                             image only reaches the local Docker daemon, never the kind node's
+                             containerd, so the restarted pod silently keeps running the old code
   --skip-helm               Skip the Helm upgrade + rollout restart step
   --skip-terraform          Skip the Terraform apply step
+  --skip-kind-load          Don't load images into a kind cluster, even if one is detected
   -h, --help                Show this help
 EOF
 }
@@ -92,13 +105,15 @@ while [[ $# -gt 0 ]]; do
     --credex-url) CREDEX_URL="$2"; shift 2 ;;
     --credex-audience) CREDEX_AUDIENCE="$2"; shift 2 ;;
     --credex-discovery-url) CREDEX_DISCOVERY_URL="$2"; shift 2 ;;
-    --credex-client-secret) CREDEX_CLIENT_SECRET="$2"; shift 2 ;;
-    --credex-client-auth-method) CREDEX_CLIENT_AUTHENTICATION_METHOD="$2"; shift 2 ;;
     --aws-region) AWS_REGION="$2"; shift 2 ;;
     --function-name) FUNCTION_NAME="$2"; shift 2 ;;
     --webhook-url) WEBHOOK_URL="$2"; shift 2 ;;
+    --image-prefix) IMAGE_PREFIX="$2"; shift 2 ;;
+    --image-tag) IMAGE_TAG="$2"; shift 2 ;;
+    --kind-cluster) KIND_CLUSTER="$2"; shift 2 ;;
     --skip-helm) SKIP_HELM=1; shift ;;
     --skip-terraform) SKIP_TERRAFORM=1; shift ;;
+    --skip-kind-load) SKIP_KIND_LOAD=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -108,6 +123,15 @@ require kube-context "$KUBE_CONTEXT"
 
 namespace_args=()
 [[ -n "$NAMESPACE" ]] && namespace_args=(--namespace "$NAMESPACE")
+
+# credex_discovery_url must be the full discovery document URL (ending in
+# /.well-known/openid-configuration) — AWS's AgentCore Credential Provider
+# requires exactly this suffixed form (enforced server-side by a regex), and
+# bank-server's own code expects the same shape (it no longer appends the
+# suffix itself). If --credex-discovery-url wasn't given, derive it from
+# --credex-url by appending the standard suffix, rather than passing the
+# bare issuer through unsuffixed.
+RESOLVED_CREDEX_DISCOVERY_URL="${CREDEX_DISCOVERY_URL:-${CREDEX_URL%/}/.well-known/openid-configuration}"
 
 if [[ "$SKIP_HELM" -eq 0 ]]; then
   require server-spiffe-id "$SERVER_SPIFFE_ID"
@@ -120,6 +144,13 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     exit 1
   fi
   echo "    ${AGENT_AUTHORIZED_ACTOR}"
+
+  # Without this, a rebuilt ko.local/ image never reaches the kind node's
+  # containerd — imagePullPolicy=Never means the rollout restart below just
+  # recreates the pod against whatever's already cached there, silently
+  # keeping the old code running even after a real rebuild.
+  maybe_kind_load "$IMAGE_PREFIX" "$KIND_CLUSTER" "$SKIP_KIND_LOAD" \
+    "${IMAGE_PREFIX}bank-server:${IMAGE_TAG}" "${IMAGE_PREFIX}bank-client:${IMAGE_TAG}"
 
   echo "==> helm upgrade ${RELEASE} (authMode=spiffe, kube-context=${KUBE_CONTEXT})"
   # --reuse-values is essential here: without it, Helm resets every value not
@@ -135,7 +166,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     --set spiffe.clientSpiffeId="$CLIENT_SPIFFE_ID" \
     --set spiffe.lambdaSpiffeId="$LAMBDA_SPIFFE_ID" \
     --set spiffe.agentAuthorizedActor="$AGENT_AUTHORIZED_ACTOR" \
-    --set credex.discoveryUrl="${CREDEX_DISCOVERY_URL:-$CREDEX_URL}"
+    --set credex.discoveryUrl="$RESOLVED_CREDEX_DISCOVERY_URL"
 
   echo "==> kubectl rollout restart"
   kubectl rollout restart "${namespace_args[@]}" --context "$KUBE_CONTEXT" deployment/bank-server deployment/bank-client
@@ -184,9 +215,7 @@ if [[ "$SKIP_TERRAFORM" -eq 0 ]]; then
     -var "bank_server_agent_api_url=${AGENT_API_URL}" \
     -var "oidc_discovery_url=${OIDC_DISCOVERY_URL}" \
     -var "oidc_allowed_clients=[\"${OIDC_CLIENT_ID}\"]" \
-    -var "credex_discovery_url=${CREDEX_DISCOVERY_URL:-$CREDEX_URL}" \
-    -var "credex_client_secret=${CREDEX_CLIENT_SECRET}" \
-    -var "credex_client_authentication_method=${CREDEX_CLIENT_AUTHENTICATION_METHOD}"
+    -var "credex_discovery_url=${RESOLVED_CREDEX_DISCOVERY_URL}"
 else
   echo "==> Skipping Terraform (--skip-terraform)"
 fi

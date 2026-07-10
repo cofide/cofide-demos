@@ -134,19 +134,37 @@ The last row is the important nuance: **Credex is required either way**, but
 Option B changes *what kind of proof of workload identity Credex is asked to
 trust* — an AWS STS-issued, IAM-role-scoped JWT, rather than a SPIFFE SVID.
 
-## Open questions to confirm before claiming this works in a demo
+## Confirmed since this was first written
 
-- **Does Credex accept an `AWS_IAM_ID_TOKEN_JWT` as a valid actor token?**
-  That means trusting AWS STS's JWKS for the relevant account/role as an
-  additional attestation source, alongside (or instead of) SPIFFE SVIDs.
-  This is a Credex product question, not an AWS one — not something to
-  assert as already supported.
+- **Client authentication**: Credex's RFC 7523 `jwt-bearer` client
+  authentication path (`exchange/oauth/authserver/client_auth.go`) does
+  accept an `AWS_IAM_ID_TOKEN_JWT` — it validates the AWS-issued token
+  against a trusted-issuer JWKS, the same mechanism already used for
+  external JWT subject tokens. `terraform/agentcore.tf` now fixes
+  `client_authentication_method` to `AWS_IAM_ID_TOKEN_JWT` (no longer a
+  variable) on the strength of this. The one remaining prerequisite is
+  operational, not code: Credex must actually have this AWS account's
+  web-identity-federation issuer registered as a trusted issuer, which
+  is not yet done (as of this writing).
+- **Actor tokens**: Credex's `actor_token_type` originally only accepted
+  `access_token`/`jwt_spiffe` — a raw external JWT (what
+  `AWS_IAM_ID_TOKEN_JWT` produces directly) wasn't a valid actor token,
+  which is why `agentcore.tf` uses `actorTokenContent = "M2M"` (an extra
+  client-credentials round trip) rather than presenting it directly.
+  Credex has since gained support for a plain external JWT as an actor
+  token too, closing that gap — but `bank-agent`'s config deliberately
+  still uses the two-call M2M flow for now, pending further discussion.
+
+## Still true
+
 - `AWS_IAM_ID_TOKEN_JWT` requires the AWS account to have **outbound web
   identity federation enabled** (`EnableOutboundWebIdentityFederation`) —
   an account-level prerequisite.
 - AWS IAM roles are typically coarser-grained than SPIFFE IDs — using this
   path well would mean one execution role per agent, not a shared role
-  across many agents, to keep the actor claim meaningfully scoped.
+  across many agents, to keep the actor claim meaningfully scoped. (Confirmed:
+  the `sub` claim AWS puts in this token is literally the IAM role ARN — see
+  AWS's outbound identity federation docs.)
 
 ## Talking points for the demo
 

@@ -50,6 +50,13 @@ AUTH_MODE = os.environ.get("AUTH_MODE", "static")
 BANK_SERVER_SUMMARY_URL = os.environ["BANK_SERVER_SUMMARY_URL"]
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "eu.amazon.nova-lite-v1:0")
 CREDEX_PROVIDER_NAME = os.environ.get("CREDEX_PROVIDER_NAME", "credex-provider")
+# GetResourceOauth2Token requires a non-empty "scopes" list. bank-server's
+# own delegated-token validation (bank-server/delegated_auth.go) doesn't
+# check scope at all, so the only thing that actually depends on this is
+# whatever Credex's own policy for this exchange expects — matches
+# terraform/variables.tf's credex_obo_scopes default; adjust both if that
+# policy expects something else.
+CREDEX_OBO_SCOPES = [s for s in os.environ.get("CREDEX_OBO_SCOPES", "summary:read").split(",") if s]
 
 SYSTEM_PROMPT = (
     "You are a spending-insights assistant for Cofide Bank. Use the "
@@ -98,7 +105,11 @@ def build_agent(on_behalf_of: str, workload_access_token: str) -> Agent:
         else:
             raise ValueError(f"invalid AUTH_MODE: {AUTH_MODE}")
 
-        resp = requests.get(BANK_SERVER_SUMMARY_URL, headers=headers, timeout=10)
+        try:
+            resp = requests.get(BANK_SERVER_SUMMARY_URL, headers=headers, timeout=10)
+        except requests.exceptions.RequestException:
+            logger.exception("Failed to reach bank-server")
+            raise
         if not resp.ok:
             logger.warning("bank-server rejected request status=%s body=%s", resp.status_code, resp.text)
         resp.raise_for_status()
@@ -108,11 +119,22 @@ def build_agent(on_behalf_of: str, workload_access_token: str) -> Agent:
 
 
 def _exchange_for_delegated_token(workload_access_token: str) -> str:
-    resp = identity_client.get_resource_oauth2_token(
-        resourceCredentialProviderName=CREDEX_PROVIDER_NAME,
-        oauth2Flow="ON_BEHALF_OF_TOKEN_EXCHANGE",
-        workloadIdentityToken=workload_access_token,
-    )
+    # Strands' tool-calling loop catches exceptions raised here and has the
+    # model narrate a generic apology instead of surfacing them — without
+    # this log, a failure in the OBO exchange itself leaves no trace
+    # anywhere (bedrock_agentcore.app only logs a rich traceback for
+    # exceptions that escape the entrypoint entirely, which a caught tool
+    # error never does).
+    try:
+        resp = identity_client.get_resource_oauth2_token(
+            resourceCredentialProviderName=CREDEX_PROVIDER_NAME,
+            oauth2Flow="ON_BEHALF_OF_TOKEN_EXCHANGE",
+            workloadIdentityToken=workload_access_token,
+            scopes=CREDEX_OBO_SCOPES,
+        )
+    except Exception:
+        logger.exception("Credex On-Behalf-Of token exchange failed")
+        raise
     logger.info("Credex minted a delegated token via AgentCore Identity's On-Behalf-Of exchange")
     return resp["accessToken"]
 

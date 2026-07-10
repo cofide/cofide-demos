@@ -86,7 +86,12 @@ def _exchange_for_jwt_svid():
     import boto3
 
     token_exchange_url = os.environ["TOKEN_EXCHANGE_URL"]
-    credex_audience = os.environ.get("CREDEX_AUDIENCE", "cofide-credex")
+    # Credex's bespoke exchange endpoint mints the outbound JWT-SVID's
+    # audience as a literal pass-through of whatever audience is requested
+    # here (see exchange/exchange/oidc/oidc.go in the Credex repo) — so this
+    # must match bank-server's webhookAudience constant, not just identify
+    # Credex as the token's recipient.
+    credex_audience = os.environ.get("CREDEX_AUDIENCE", "bank-server-webhook")
 
     sts = boto3.client("sts")
     resp = sts.get_web_identity_token(
