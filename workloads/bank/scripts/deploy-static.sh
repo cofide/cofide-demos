@@ -179,6 +179,19 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     --set oidc.discoveryUrl="$OIDC_DISCOVERY_URL" \
     --set oidc.clientId="$OIDC_CLIENT_ID" \
     --set oidc.redirectUrl="$OIDC_REDIRECT_URL"
+
+  # Unconditional, not tied to whether Helm detected a diff: image.tag stays
+  # "latest" across rebuilds (see scripts/build-bank-agent.sh's timestamp-tag
+  # comment for why a mutable tag doesn't trigger a natural rollout on its
+  # own), and imagePullPolicy=Never means the kubelet won't re-pull it
+  # either — so a rebuilt image only reaches a running pod if we explicitly
+  # restart it here, every run.
+  restart_namespace_args=()
+  [[ -n "$NAMESPACE" ]] && restart_namespace_args=(--namespace "$NAMESPACE")
+  echo "==> kubectl rollout restart"
+  kubectl rollout restart "${restart_namespace_args[@]}" --context "$KUBE_CONTEXT" deployment/bank-server deployment/bank-client
+  kubectl rollout status "${restart_namespace_args[@]}" --context "$KUBE_CONTEXT" deployment/bank-server
+  kubectl rollout status "${restart_namespace_args[@]}" --context "$KUBE_CONTEXT" deployment/bank-client
 else
   echo "==> Skipping Helm (--skip-helm)"
 fi

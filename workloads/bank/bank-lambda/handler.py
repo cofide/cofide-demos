@@ -17,9 +17,23 @@ Invoke manually during a demo, e.g.:
 
 import base64
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
+
+# logging.basicConfig() is a documented no-op if the root logger already has
+# handlers attached — which the Lambda Python runtime does before user code
+# runs (AWS's own docs note this and warn against relying on basicConfig
+# here). Configuring this logger directly, rather than relying on
+# basicConfig succeeding, means these log lines show up regardless of
+# whatever the runtime already set up on root.
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+    logger.addHandler(_handler)
 
 DEFAULT_TRANSACTION = {
     "merchant": "Cofide Payments Ltd",
@@ -34,14 +48,19 @@ def handler(event, context):
     auth_mode = os.environ.get("AUTH_MODE", "static")
 
     if auth_mode == "spiffe":
+        logger.info("Authenticating to bank-server mechanism=jwt_svid caller=bank-lambda")
         token = _exchange_for_jwt_svid()
     elif auth_mode == "static":
+        logger.info("Authenticating to bank-server mechanism=static caller=bank-lambda")
         token = os.environ["STATIC_WEBHOOK_API_KEY"]
     else:
         raise ValueError(f"invalid AUTH_MODE: {auth_mode}")
 
     status, body = _post_transaction(webhook_url, transaction, token)
-    print(f"bank-server responded {status}: {body}")
+    if status >= 400:
+        logger.warning("bank-server rejected request status=%s body=%s", status, body)
+    else:
+        logger.info("bank-server accepted request status=%s", status)
     return {"statusCode": status, "body": body}
 
 
@@ -76,7 +95,10 @@ def _exchange_for_jwt_svid():
         DurationSeconds=300,
     )
     aws_jwt = resp["WebIdentityToken"]
-    print(f"AWS JWT obtained (sub={_decode_claim(aws_jwt, 'sub')})")
+    logger.info(
+        "Obtained AWS identity JWT sub=%s (asserted by AWS STS; not yet verified by Credex)",
+        _decode_claim(aws_jwt, "sub"),
+    )
 
     body = json.dumps({"InboundToken": aws_jwt}).encode()
     req = urllib.request.Request(
@@ -92,11 +114,18 @@ def _exchange_for_jwt_svid():
         with urllib.request.urlopen(req) as r:
             payload = json.loads(r.read())
     except urllib.error.HTTPError as e:
-        print(f"Credex error {e.code}: {e.read().decode('utf-8', errors='replace')}")
+        logger.warning(
+            "Credex rejected AWS identity JWT status=%s body=%s",
+            e.code,
+            e.read().decode("utf-8", errors="replace"),
+        )
         raise
 
     svid = payload["token"]
-    print(f"JWT-SVID obtained (sub={_decode_claim(svid, 'sub')})")
+    logger.info(
+        "Credex exchanged AWS identity for a JWT-SVID sub=%s (verified by Credex; bank-server will independently re-verify)",
+        _decode_claim(svid, "sub"),
+    )
     return svid
 
 

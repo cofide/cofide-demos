@@ -91,7 +91,7 @@ The agent-related variables below are optional even in their "if" mode — `bank
 | `STATIC_AGENT_API_KEY` | No | — | Bearer key expected from `bank-agent`; its route isn't registered if unset |
 | `CLIENT_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID for `bank-client` |
 | `LAMBDA_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-lambda` |
-| `AGENT_SPIFFE_ID` | No | — | Authorised SPIFFE ID (delegated token's `act.sub`) for `bank-agent`; its route isn't registered if unset |
+| `AGENT_AUTHORIZED_ACTOR` | No | — | Authorised actor (delegated token's `act.sub`) for `bank-agent` — not a SPIFFE ID, since `bank-agent` is an AgentCore Runtime workload with no SPIFFE identity; it's the AWS IAM execution role ARN that ends up there (see `terraform output bank_agent_execution_role_arn`). Its route isn't registered if unset |
 | `CREDEX_DISCOVERY_URL` | No | — | Credex OIDC discovery URL, used to fetch the JWKS that validates `bank-agent`'s delegated tokens; its route isn't registered if unset |
 | `AGENT_TOKEN_AUDIENCE` | No | `bank-server-agent-api` | Expected `aud` claim on `bank-agent`'s delegated tokens |
 | `SPIFFE_ENDPOINT_SOCKET` | No | `unix:///spiffe-workload-api/spire-agent.sock` | SPIFFE Workload API socket path |
@@ -278,7 +278,7 @@ kubectl -n bank rollout restart deployment/bank-client
 
 #### 4. Toggle to SPIFFE (after onboarding into Connect)
 
-Requires a cluster with SPIRE/Cofide Connect and the `csi.spiffe.io` CSI driver installed, as with every other SPIFFE demo in this repo, and the four SPIFFE IDs below already registered in your trust zone/Credex config (that registration happens outside this repo).
+Requires a cluster with SPIRE/Cofide Connect and the `csi.spiffe.io` CSI driver installed, as with every other SPIFFE demo in this repo, and the three SPIFFE IDs below already registered in your trust zone/Credex config (that registration happens outside this repo). `bank-agent` has no SPIFFE identity of its own (it's an AgentCore Runtime workload, not a k8s pod) — its authorized-actor value is its IAM execution role ARN, auto-detected from `terraform`'s own output below rather than registered anywhere.
 
 ```bash
 helm upgrade bank ./chart/bank \
@@ -288,7 +288,7 @@ helm upgrade bank ./chart/bank \
   --set spiffe.serverSpiffeId=spiffe://<trust-domain>/bank/server \
   --set spiffe.clientSpiffeId=spiffe://<trust-domain>/bank/client \
   --set spiffe.lambdaSpiffeId=spiffe://<trust-domain>/bank/lambda \
-  --set spiffe.agentSpiffeId=spiffe://<trust-domain>/bank/agent \
+  --set spiffe.agentAuthorizedActor="$(terraform -chdir=terraform output -raw bank_agent_execution_role_arn)" \
   --set credex.discoveryUrl=<cofide-credex-oidc-discovery-url>
 
 kubectl -n bank rollout restart deployment/bank-server deployment/bank-client
@@ -302,7 +302,6 @@ terraform apply \
   -var oidc_discovery_url="$(terraform -chdir=bootstrap output -raw oidc_discovery_url)" \
   -var "oidc_allowed_clients=[\"$(terraform -chdir=bootstrap output -raw oidc_client_id)\"]" \
   -var credex_discovery_url=<cofide-credex-oidc-discovery-url> \
-  -var credex_client_id=<credex-client-id> \
   -var credex_client_secret=<credex-client-secret>
 ```
 

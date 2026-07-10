@@ -31,12 +31,15 @@ func handleDashboard(fetcher *summaryFetcher, tmpl *template.Template, authMode 
 		var loggedIn bool
 		var userName string
 		if chatEnabled {
-			if sess, err := sessions.fromRequest(r); err == nil {
-				loggedIn = true
-				userName = sess.Name
-				if userName == "" {
-					userName = sess.Subject
-				}
+			sess, err := sessions.fromRequest(r)
+			if err != nil {
+				http.Redirect(w, r, "/login", http.StatusFound)
+				return
+			}
+			loggedIn = true
+			userName = sess.Name
+			if userName == "" {
+				userName = sess.Subject
 			}
 		}
 

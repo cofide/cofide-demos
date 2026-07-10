@@ -45,8 +45,8 @@ spec:
             # deployment bootstrap (see the README), so bank-server must be
             # able to run in spiffe mode before it's configured — it just
             # disables the agent-facing listener until both are set.
-            - name: AGENT_SPIFFE_ID
-              value: {{ .Values.spiffe.agentSpiffeId | quote }}
+            - name: AGENT_AUTHORIZED_ACTOR
+              value: {{ .Values.spiffe.agentAuthorizedActor | quote }}
             - name: CREDEX_DISCOVERY_URL
               value: {{ .Values.credex.discoveryUrl | quote }}
             {{- end }}

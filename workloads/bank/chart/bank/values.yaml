@@ -10,14 +10,20 @@ image:
   tag: latest
   pullPolicy: Never
 
-# Only used when authMode is "spiffe". These must match the SPIFFE IDs
-# registered for each workload in your trust domain.
+# Only used when authMode is "spiffe". serverSpiffeId/clientSpiffeId/
+# lambdaSpiffeId must match the SPIFFE IDs registered for each workload in
+# your trust domain. agentAuthorizedActor is different: bank-agent (an
+# AgentCore Runtime workload) has no SPIFFE identity at all — it's the "sub"
+# claim AWS puts in the identity JWT it presents to Credex (i.e. bank-agent's
+# IAM execution role ARN, see terraform output bank_agent_execution_role_arn),
+# which is what ends up in a delegated token's "act.sub" for bank-server to
+# authorize.
 spiffe:
   socketPath: unix:///spiffe-workload-api/spire-agent.sock
   serverSpiffeId: ""
   clientSpiffeId: ""
   lambdaSpiffeId: ""
-  agentSpiffeId: ""
+  agentAuthorizedActor: ""
 
 # Only used when authMode is "static". Change these before deploying to a
 # shared cluster.

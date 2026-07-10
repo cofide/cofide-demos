@@ -24,6 +24,7 @@ Auth mode for the outbound call to bank-server is controlled by AUTH_MODE:
 
 import base64
 import json
+import logging
 import os
 
 import boto3
@@ -31,6 +32,19 @@ import requests
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent, tool
 from strands.models import BedrockModel
+
+# logging.basicConfig() is a documented no-op if the root logger already has
+# handlers attached — which the AgentCore runtime (or one of boto3/
+# bedrock_agentcore's own imports, above) does before this module finishes
+# loading. Configuring this logger directly, rather than relying on
+# basicConfig succeeding, means these log lines show up regardless of
+# whatever the runtime already set up on root.
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(_handler)
 
 AUTH_MODE = os.environ.get("AUTH_MODE", "static")
 BANK_SERVER_SUMMARY_URL = os.environ["BANK_SERVER_SUMMARY_URL"]
@@ -71,12 +85,22 @@ def build_agent(on_behalf_of: str, workload_access_token: str) -> Agent:
         if AUTH_MODE == "static":
             headers["Authorization"] = f"Bearer {os.environ['STATIC_AGENT_API_KEY']}"
             headers["X-On-Behalf-Of"] = on_behalf_of
+            logger.info(
+                "Calling bank-server mechanism=static caller=bank-agent on_behalf_of_asserted_unverified=%s",
+                on_behalf_of,
+            )
         elif AUTH_MODE == "spiffe":
             headers["Authorization"] = f"Bearer {_exchange_for_delegated_token(workload_access_token)}"
+            logger.info(
+                "Calling bank-server mechanism=delegated_jwt caller=bank-agent on_behalf_of_verified=%s",
+                on_behalf_of,
+            )
         else:
             raise ValueError(f"invalid AUTH_MODE: {AUTH_MODE}")
 
         resp = requests.get(BANK_SERVER_SUMMARY_URL, headers=headers, timeout=10)
+        if not resp.ok:
+            logger.warning("bank-server rejected request status=%s body=%s", resp.status_code, resp.text)
         resp.raise_for_status()
         return resp.text
 
@@ -89,6 +113,7 @@ def _exchange_for_delegated_token(workload_access_token: str) -> str:
         oauth2Flow="ON_BEHALF_OF_TOKEN_EXCHANGE",
         workloadIdentityToken=workload_access_token,
     )
+    logger.info("Credex minted a delegated token via AgentCore Identity's On-Behalf-Of exchange")
     return resp["accessToken"]
 
 
@@ -97,14 +122,41 @@ def _decode_claim(token: str, claim: str) -> str:
     return payload.get(claim, "unknown")
 
 
+def _get_header(headers: dict, name: str) -> str:
+    """Case-insensitive header lookup. context.request_headers' key casing
+    isn't guaranteed to match the literal name callers expect — e.g. an
+    HTTP/2 connection lowercases all header names on the wire (RFC 7540
+    8.1.2), so "Authorization" can arrive as "authorization". A plain dict
+    lookup on the exact expected casing would silently miss it.
+    """
+    name_lower = name.lower()
+    for key, value in headers.items():
+        if key.lower() == name_lower:
+            return value
+    return ""
+
+
 @app.entrypoint
 def invoke(payload, context):
     question = payload.get("question", "")
 
-    auth_header = context.request_headers.get("Authorization", "")
+    auth_header = _get_header(context.request_headers, "Authorization")
     user_token = auth_header[len("Bearer ") :] if auth_header.startswith("Bearer ") else ""
     on_behalf_of = _decode_claim(user_token, "sub") if user_token else "unknown"
-    workload_access_token = context.request_headers.get("WorkloadAccessToken", "")
+    workload_access_token = _get_header(context.request_headers, "WorkloadAccessToken")
+
+    if on_behalf_of == "unknown":
+        # AgentCore Runtime's inbound authorizer already rejects requests
+        # without a valid token before this code runs, so reaching here with
+        # no usable Authorization header means something about how it's
+        # being read is wrong, not that the caller is unauthenticated — log
+        # the actual header names received to make that debuggable.
+        logger.warning("No usable Authorization header found; received header names: %s", list(context.request_headers.keys()))
+
+    logger.info(
+        "Handling request on_behalf_of=%s (verified by AgentCore Runtime's inbound JWT authorizer before this code ran)",
+        on_behalf_of,
+    )
 
     agent = build_agent(on_behalf_of, workload_access_token)
     result = agent(question)

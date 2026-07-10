@@ -134,11 +134,23 @@ resource "aws_iam_role_policy" "bank_agent_obo_exchange" {
 #
 # Registers Credex as an OAuth2 Credential Provider so AgentCore Identity's
 # On-Behalf-Of token exchange can broker delegated tokens on bank-agent's
-# behalf — see workloads/bank/docs/agentcore-identity.md for the mechanics,
-# and its "Risks" section for what's unconfirmed with the Credex team about
-# this integration (accepting a non-SPIFFE subject_token, a non-SPIFFE
-# actor_token via AWS_IAM_ID_TOKEN_JWT, and how bank-agent authenticates as
-# an OAuth2 client here).
+# behalf — see workloads/bank/docs/agentcore-identity.md for the mechanics.
+#
+# Client authentication (client_authentication_method = AWS_IAM_ID_TOKEN_JWT
+# below) uses Credex's RFC 7523 jwt-bearer path (exchange/oauth/authserver/
+# client_auth.go), which validates the AWS-issued token against a
+# trusted-issuer JWKS resolver rather than requiring a SPIFFE SVID — but this
+# still requires Credex to have this AWS account's web-identity-federation
+# issuer registered as a trusted issuer, which is not yet done (as of this
+# writing). The actor token, however, deliberately uses actorTokenContent =
+# "M2M" below rather than AWS_IAM_ID_TOKEN_JWT: Credex's actor_token_type
+# validation (exchange/oauth/handler/rfc8693/handler.go's
+# supportedActorTokenTypes) only accepts "access_token" or "jwt_spiffe" — a
+# raw external JWT is not a valid actor token, only a valid client
+# assertion/subject token. M2M makes AgentCore fetch a Credex-issued
+# client-credentials access token first (authenticating the same jwt-bearer
+# way) and present that as the actor token, which lands on the
+# "access_token" path.
 #
 # terraform-provider-aws 6.53.0 (the latest available at the time this was
 # written) doesn't yet expose two fields this integration needs —
@@ -156,7 +168,6 @@ resource "aws_bedrockagentcore_oauth2_credential_provider" "credex" {
 
   oauth2_provider_config {
     custom_oauth2_provider_config {
-      client_id     = var.credex_client_id
       client_secret = var.credex_client_secret
 
       oauth_discovery {
@@ -174,13 +185,17 @@ locals {
       oauthDiscovery = {
         discoveryUrl = var.credex_discovery_url
       }
-      clientId                   = var.credex_client_id
       clientSecret               = var.credex_client_secret
       clientAuthenticationMethod = var.credex_client_authentication_method
       onBehalfOfTokenExchangeConfig = {
         grantType = "TOKEN_EXCHANGE"
         tokenExchangeGrantTypeConfig = {
-          actorTokenContent = "AWS_IAM_ID_TOKEN_JWT"
+          # Not AWS_IAM_ID_TOKEN_JWT: Credex only accepts "access_token" or
+          # "jwt_spiffe" as actor_token_type (see comment above the
+          # aws_bedrockagentcore_oauth2_credential_provider resource). M2M
+          # has AgentCore fetch a Credex-issued access token via
+          # client-credentials first, landing on the "access_token" path.
+          actorTokenContent = "M2M"
         }
       }
     }
@@ -192,7 +207,6 @@ resource "null_resource" "credex_obo_config" {
 
   triggers = {
     discovery_url                = var.credex_discovery_url
-    client_id                    = var.credex_client_id
     client_authentication_method = var.credex_client_authentication_method
   }
 

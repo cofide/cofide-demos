@@ -88,12 +88,6 @@ variable "credex_discovery_url" {
   default     = ""
 }
 
-variable "credex_client_id" {
-  description = "OAuth2 client ID identifying bank-agent to Credex, regardless of credex_client_authentication_method."
-  type        = string
-  default     = ""
-}
-
 variable "credex_client_secret" {
   description = "OAuth2 client secret bank-agent's Credential Provider uses to authenticate to Credex. Only used when credex_client_authentication_method = \"CLIENT_SECRET_BASIC\" or \"CLIENT_SECRET_POST\"."
   type        = string

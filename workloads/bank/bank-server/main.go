@@ -29,18 +29,18 @@ func main() {
 }
 
 type Env struct {
-	AuthMode            string
-	ClientAPIAddress    string
-	WebhookAddress      string
-	SpiffeSocketPath    string
-	ClientSPIFFEID      string
-	LambdaSPIFFEID      string
-	AgentSPIFFEID       string
-	StaticClientAPIKey  string
-	StaticWebhookAPIKey string
-	StaticAgentAPIKey   string
-	CredexDiscoveryURL  string
-	AgentTokenAudience  string
+	AuthMode             string
+	ClientAPIAddress     string
+	WebhookAddress       string
+	SpiffeSocketPath     string
+	ClientSPIFFEID       string
+	LambdaSPIFFEID       string
+	AgentAuthorizedActor string
+	StaticClientAPIKey   string
+	StaticWebhookAPIKey  string
+	StaticAgentAPIKey    string
+	CredexDiscoveryURL   string
+	AgentTokenAudience   string
 }
 
 func mustGetEnv(variable string) string {
@@ -81,7 +81,7 @@ func getEnv() *Env {
 	case authModeSPIFFE:
 		env.ClientSPIFFEID = mustGetEnv("CLIENT_SPIFFE_ID")
 		env.LambdaSPIFFEID = mustGetEnv("LAMBDA_SPIFFE_ID")
-		env.AgentSPIFFEID = getEnvWithDefault("AGENT_SPIFFE_ID", "")
+		env.AgentAuthorizedActor = getEnvWithDefault("AGENT_AUTHORIZED_ACTOR", "")
 		env.CredexDiscoveryURL = getEnvWithDefault("CREDEX_DISCOVERY_URL", "")
 		env.AgentTokenAudience = getEnvWithDefault("AGENT_TOKEN_AUDIENCE", "bank-server-agent-api")
 	default:
@@ -117,10 +117,10 @@ func run(ctx context.Context, env *Env) error {
 // instead of one per AWS-hosted caller.
 func runStatic(env *Env, summaryHandler, webhookHandler http.HandlerFunc) error {
 	clientMux := http.NewServeMux()
-	clientMux.HandleFunc("/api/summary", staticAuthMiddleware(env.StaticClientAPIKey, summaryHandler))
+	clientMux.HandleFunc("/api/summary", staticAuthMiddleware("bank-client", env.StaticClientAPIKey, summaryHandler))
 
 	externalMux := http.NewServeMux()
-	externalMux.HandleFunc("/webhook/transactions", staticAuthMiddleware(env.StaticWebhookAPIKey, webhookHandler))
+	externalMux.HandleFunc("/webhook/transactions", staticAuthMiddleware("bank-lambda", env.StaticWebhookAPIKey, webhookHandler))
 
 	// bank-agent has its own separate deployment bootstrap (see
 	// workloads/bank/README.md) — don't register this route until it's
@@ -178,19 +178,14 @@ func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler htt
 
 	clientMux := http.NewServeMux()
 	clientMux.HandleFunc("/api/summary", summaryHandler)
-	tlsConfig := tlsconfig.MTLSServerConfig(x509Source, x509Source, tlsconfig.AuthorizeOneOf(clientSPIFFEID))
+	tlsConfig := tlsconfig.MTLSServerConfig(x509Source, x509Source, loggingAuthorizer("bank-client", tlsconfig.AuthorizeOneOf(clientSPIFFEID)))
 	clientServer := httpServer(env.ClientAPIAddress, clientMux)
 	clientServer.TLSConfig = tlsConfig
 
 	// bank-agent has its own separate deployment bootstrap (see
 	// workloads/bank/README.md) — don't register this route, or discover
 	// Credex's JWKS endpoint, until it's configured.
-	if env.AgentSPIFFEID != "" && env.CredexDiscoveryURL != "" {
-		agentSPIFFEID, err := spiffeid.FromString(env.AgentSPIFFEID)
-		if err != nil {
-			return fmt.Errorf("failed to parse AGENT_SPIFFE_ID: %w", err)
-		}
-
+	if env.AgentAuthorizedActor != "" && env.CredexDiscoveryURL != "" {
 		httpClient := &http.Client{Timeout: 10 * time.Second}
 		slog.Info("Discovering Credex JWKS endpoint", "issuer", env.CredexDiscoveryURL)
 		jwksURI, err := discoverJWKSURI(env.CredexDiscoveryURL, httpClient)
@@ -199,9 +194,9 @@ func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler htt
 		}
 		jwksFetcher := &JWKSFetcher{url: jwksURI, client: httpClient}
 
-		externalMux.HandleFunc("/api/summary", delegatedJWTAuthMiddleware(jwksFetcher, env.AgentTokenAudience, agentSPIFFEID, summaryHandler))
+		externalMux.HandleFunc("/api/summary", delegatedJWTAuthMiddleware(jwksFetcher, env.AgentTokenAudience, env.AgentAuthorizedActor, summaryHandler))
 	} else {
-		slog.Info("AGENT_SPIFFE_ID/CREDEX_DISCOVERY_URL not set — bank-agent's API is disabled")
+		slog.Info("AGENT_AUTHORIZED_ACTOR/CREDEX_DISCOVERY_URL not set — bank-agent's API is disabled")
 	}
 
 	listeners := []namedServer{

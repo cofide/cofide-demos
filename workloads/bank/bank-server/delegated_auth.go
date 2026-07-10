@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/spiffe/go-spiffe/v2/spiffeid"
 )
 
 const jwksTTL = 5 * time.Minute
@@ -117,61 +116,62 @@ type delegatedClaims struct {
 // local SPIFFE Workload API, it's an ordinary OAuth2 access token validated
 // against Credex's own published JWKS, the same way
 // workloads/ping-pong-exchange's relay mode validates delegated tokens.
-func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience string, authorizedActor spiffeid.ID, next http.HandlerFunc) http.HandlerFunc {
-	matchActor := spiffeid.MatchID(authorizedActor)
+//
+// authorizedActor is compared as a plain string, not parsed as a SPIFFE ID:
+// bank-agent's actor identity in "act.sub" is whatever Credex's delegated
+// exchange put there, which for the current AgentCore On-Behalf-Of flow
+// (terraform/agentcore.tf's M2M actorTokenContent) is the AWS IAM role ARN
+// of bank-agent's execution role, not a spiffe:// URI — Credex doesn't
+// normalize AWS-federated identities into SPIFFE IDs anywhere in this path.
+func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience string, authorizedActor string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "missing bearer token")
 			http.Error(w, "no token provided", http.StatusUnauthorized)
 			return
 		}
 
 		jwks, err := jwksFetcher.GetJWKS()
 		if err != nil {
-			slog.Error("Failed to fetch Credex JWKS", "error", err)
+			slog.Error("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed to fetch Credex JWKS", "error", err)
 			http.Error(w, "unable to fetch JWKS", http.StatusServiceUnavailable)
 			return
 		}
 
 		tok, err := jwt.ParseSigned(token, allowedSignatureAlgs)
 		if err != nil {
-			slog.Warn("Failed to parse delegated token", "error", err)
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed to parse token", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		var claims delegatedClaims
 		if err := tok.Claims(jwks, &claims); err != nil {
-			slog.Warn("Failed to verify delegated token", "error", err)
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed signature verification against Credex JWKS", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		if err := claims.ValidateWithLeeway(jwt.Expected{Time: time.Now()}, 0); err != nil {
-			slog.Warn("Delegated token failed time validation", "error", err)
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed time validation", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		if !slices.Contains([]string(claims.Audience), expectedAudience) {
-			slog.Warn("Invalid audience in delegated token", "audience", claims.Audience, "expected", expectedAudience)
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "wrong audience", "audience", claims.Audience, "expected", expectedAudience)
 			http.Error(w, "invalid audience in token", http.StatusUnauthorized)
 			return
 		}
 
 		if claims.Act == nil || claims.Act.Sub == "" {
-			slog.Warn("Missing act claim in delegated token")
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "missing act claim")
 			http.Error(w, "missing act claim", http.StatusUnauthorized)
 			return
 		}
-		actorID, err := spiffeid.FromString(claims.Act.Sub)
-		if err != nil {
-			slog.Warn("Invalid act.sub in delegated token", "act_sub", claims.Act.Sub)
-			http.Error(w, "invalid actor", http.StatusUnauthorized)
-			return
-		}
-		if err := matchActor(actorID); err != nil {
-			slog.Warn("Rejected unauthorized actor", "actor", claims.Act.Sub)
+		if claims.Act.Sub != authorizedActor {
+			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "unauthorized actor", "actor", claims.Act.Sub)
 			http.Error(w, "unauthorized actor", http.StatusForbidden)
 			return
 		}
@@ -180,7 +180,7 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 		if onBehalfOf == "" {
 			onBehalfOf = "unknown"
 		}
-		slog.Info("Authorised bank-agent request", "on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub)
+		slog.Info("Authorised request", "mechanism", "delegated_jwt", "caller", "bank-agent", "on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub)
 
 		next(w, r)
 	}

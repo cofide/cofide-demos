@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -15,9 +16,10 @@ import (
 // this is a plain HTTP GET with a bearer API key; in spiffe mode it's an
 // mTLS GET authenticated with the client's X.509-SVID.
 type summaryFetcher struct {
-	client *http.Client
-	url    string
-	apiKey string
+	client    *http.Client
+	url       string
+	apiKey    string
+	mechanism string
 }
 
 func buildFetcher(ctx context.Context, env *Env) (*summaryFetcher, error) {
@@ -25,7 +27,8 @@ func buildFetcher(ctx context.Context, env *Env) (*summaryFetcher, error) {
 
 	switch env.AuthMode {
 	case authModeStatic:
-		return &summaryFetcher{client: &http.Client{}, url: url, apiKey: env.StaticClientAPIKey}, nil
+		slog.Info("Configured bank-server client", "mechanism", "static", "url", url)
+		return &summaryFetcher{client: &http.Client{}, url: url, apiKey: env.StaticClientAPIKey, mechanism: "static"}, nil
 	case authModeSPIFFE:
 		source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
 		if err != nil {
@@ -37,7 +40,8 @@ func buildFetcher(ctx context.Context, env *Env) (*summaryFetcher, error) {
 		}
 		tlsConfig := tlsconfig.MTLSClientConfig(source, source, tlsconfig.AuthorizeOneOf(serverSPIFFEID))
 		client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
-		return &summaryFetcher{client: client, url: url}, nil
+		slog.Info("Configured bank-server client", "mechanism", "mtls", "url", url, "authorized_server_spiffe_id", serverSPIFFEID.String())
+		return &summaryFetcher{client: client, url: url, mechanism: "mtls"}, nil
 	default:
 		return nil, fmt.Errorf("invalid AUTH_MODE: %s", env.AuthMode)
 	}
@@ -61,13 +65,17 @@ func (f *summaryFetcher) fetch(ctx context.Context) (Summary, error) {
 
 	resp, err := f.client.Do(req)
 	if err != nil {
+		slog.Warn("Failed to reach bank-server", "mechanism", f.mechanism, "error", err)
 		return Summary{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Warn("bank-server rejected request", "mechanism", f.mechanism, "status", resp.StatusCode)
 		return Summary{}, fmt.Errorf("unexpected status from bank-server: %d", resp.StatusCode)
 	}
+
+	slog.Info("Fetched summary from bank-server", "mechanism", f.mechanism)
 
 	var summary Summary
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {

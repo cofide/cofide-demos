@@ -19,11 +19,9 @@ BOOTSTRAP_DIR="$(resolve_bootstrap_dir)"
 SERVER_SPIFFE_ID=""
 CLIENT_SPIFFE_ID=""
 LAMBDA_SPIFFE_ID=""
-AGENT_SPIFFE_ID=""
 CREDEX_URL=""
 CREDEX_AUDIENCE="cofide-credex"
 CREDEX_DISCOVERY_URL=""
-CREDEX_CLIENT_ID=""
 CREDEX_CLIENT_SECRET=""
 CREDEX_CLIENT_AUTHENTICATION_METHOD="AWS_IAM_ID_TOKEN_JWT"
 AWS_REGION=""
@@ -35,7 +33,7 @@ SKIP_TERRAFORM=0
 usage() {
   cat <<EOF
 Usage: $(basename "$0") --kube-context <name> --server-spiffe-id <id> --client-spiffe-id <id> \\
-         --lambda-spiffe-id <id> --agent-spiffe-id <id> --credex-url <url> --aws-region <region> \\
+         --lambda-spiffe-id <id> --credex-url <url> --aws-region <region> \\
          [options]
 
 Required:
@@ -44,12 +42,14 @@ Required:
   --server-spiffe-id <id>   SPIFFE ID registered for bank-server, e.g. spiffe://example.org/bank/server
   --client-spiffe-id <id>   SPIFFE ID registered for bank-client, e.g. spiffe://example.org/bank/client
   --lambda-spiffe-id <id>   SPIFFE ID registered for bank-lambda, e.g. spiffe://example.org/bank/lambda
-  --agent-spiffe-id <id>    SPIFFE ID registered for bank-agent, e.g. spiffe://example.org/bank/agent
   --credex-url <url>        Cofide Credex token exchange endpoint (skip with --skip-terraform)
   --aws-region <region>     AWS region for the Lambda and bank-agent (skip with --skip-terraform)
 
 The OIDC discovery URL and allowed client are auto-detected from terraform/bootstrap's output (same
-values deploy-static.sh already used) — not passed as flags here.
+values deploy-static.sh already used) — not passed as flags here. bank-agent has no SPIFFE identity
+(it's an AgentCore Runtime workload, not a k8s pod) — the actor identity bank-server authorizes for it
+(AGENT_AUTHORIZED_ACTOR, its IAM execution role ARN) is likewise auto-detected from terraform/'s own
+output, not passed as a flag.
 
 Options:
   --release <name>          Helm release name (default: ${RELEASE})
@@ -67,7 +67,6 @@ Options:
                              exchange Credential Provider (defaults to --credex-url if omitted — pass
                              explicitly if Credex exposes a different endpoint for this than for
                              bank-lambda's bespoke exchange, see workloads/bank/docs/agentcore-identity.md)
-  --credex-client-id <id>   OAuth2 client ID identifying bank-agent to Credex
   --credex-client-secret <s>
                              OAuth2 client secret, only used if --credex-client-auth-method isn't
                              AWS_IAM_ID_TOKEN_JWT
@@ -90,11 +89,9 @@ while [[ $# -gt 0 ]]; do
     --server-spiffe-id) SERVER_SPIFFE_ID="$2"; shift 2 ;;
     --client-spiffe-id) CLIENT_SPIFFE_ID="$2"; shift 2 ;;
     --lambda-spiffe-id) LAMBDA_SPIFFE_ID="$2"; shift 2 ;;
-    --agent-spiffe-id) AGENT_SPIFFE_ID="$2"; shift 2 ;;
     --credex-url) CREDEX_URL="$2"; shift 2 ;;
     --credex-audience) CREDEX_AUDIENCE="$2"; shift 2 ;;
     --credex-discovery-url) CREDEX_DISCOVERY_URL="$2"; shift 2 ;;
-    --credex-client-id) CREDEX_CLIENT_ID="$2"; shift 2 ;;
     --credex-client-secret) CREDEX_CLIENT_SECRET="$2"; shift 2 ;;
     --credex-client-auth-method) CREDEX_CLIENT_AUTHENTICATION_METHOD="$2"; shift 2 ;;
     --aws-region) AWS_REGION="$2"; shift 2 ;;
@@ -116,7 +113,13 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
   require server-spiffe-id "$SERVER_SPIFFE_ID"
   require client-spiffe-id "$CLIENT_SPIFFE_ID"
   require lambda-spiffe-id "$LAMBDA_SPIFFE_ID"
-  require agent-spiffe-id "$AGENT_SPIFFE_ID"
+
+  echo "==> Detecting bank-agent's authorized actor (IAM execution role ARN) from terraform/ output"
+  if ! AGENT_AUTHORIZED_ACTOR="$(terraform -chdir="$TERRAFORM_DIR" output -raw bank_agent_execution_role_arn 2>/dev/null)" || [[ -z "$AGENT_AUTHORIZED_ACTOR" ]]; then
+    echo "Error: could not read bank_agent_execution_role_arn from ${TERRAFORM_DIR}. Run 'terraform apply' there first (see README)." >&2
+    exit 1
+  fi
+  echo "    ${AGENT_AUTHORIZED_ACTOR}"
 
   echo "==> helm upgrade ${RELEASE} (authMode=spiffe, kube-context=${KUBE_CONTEXT})"
   # --reuse-values is essential here: without it, Helm resets every value not
@@ -131,7 +134,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     --set spiffe.serverSpiffeId="$SERVER_SPIFFE_ID" \
     --set spiffe.clientSpiffeId="$CLIENT_SPIFFE_ID" \
     --set spiffe.lambdaSpiffeId="$LAMBDA_SPIFFE_ID" \
-    --set spiffe.agentSpiffeId="$AGENT_SPIFFE_ID" \
+    --set spiffe.agentAuthorizedActor="$AGENT_AUTHORIZED_ACTOR" \
     --set credex.discoveryUrl="${CREDEX_DISCOVERY_URL:-$CREDEX_URL}"
 
   echo "==> kubectl rollout restart"
@@ -182,7 +185,6 @@ if [[ "$SKIP_TERRAFORM" -eq 0 ]]; then
     -var "oidc_discovery_url=${OIDC_DISCOVERY_URL}" \
     -var "oidc_allowed_clients=[\"${OIDC_CLIENT_ID}\"]" \
     -var "credex_discovery_url=${CREDEX_DISCOVERY_URL:-$CREDEX_URL}" \
-    -var "credex_client_id=${CREDEX_CLIENT_ID}" \
     -var "credex_client_secret=${CREDEX_CLIENT_SECRET}" \
     -var "credex_client_authentication_method=${CREDEX_CLIENT_AUTHENTICATION_METHOD}"
 else
