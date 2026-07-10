@@ -167,6 +167,13 @@ def invoke(payload, context):
     on_behalf_of = _decode_claim(user_token, "sub") if user_token else "unknown"
     workload_access_token = _get_header(context.request_headers, "WorkloadAccessToken")
 
+    if user_token:
+        # Credex's subject_token audience check has repeatedly been guessed at
+        # (Credex's own token URL, then bank-client's OIDC client ID) without
+        # matching — logging the token's actual "aud" claim here settles what
+        # Credex must be configured to accept, instead of guessing again.
+        logger.info("Inbound user token aud=%s iss=%s", _decode_claim(user_token, "aud"), _decode_claim(user_token, "iss"))
+
     if on_behalf_of == "unknown":
         # AgentCore Runtime's inbound authorizer already rejects requests
         # without a valid token before this code runs, so reaching here with

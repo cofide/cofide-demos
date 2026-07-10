@@ -180,7 +180,17 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 			return
 		}
 
-		if !slices.Contains([]string(claims.Audience), expectedAudience) {
+		// An empty audience is accepted, not just expectedAudience: AWS Bedrock
+		// AgentCore's native On-Behalf-Of token exchange (GetResourceOauth2Token)
+		// has no audience/resource parameter at all, so the delegated token
+		// Credex issues for this flow always has an empty "aud" — there's
+		// currently no way for Credex's policy engine to supply a default
+		// audience when the requester doesn't ask for one. The act.sub check
+		// below (matching the specific, Terraform-provisioned agent execution
+		// role) is what actually authorizes this caller; this check only
+		// additionally constrains which audience a token must target when one
+		// is present.
+		if len(claims.Audience) > 0 && !slices.Contains([]string(claims.Audience), expectedAudience) {
 			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "wrong audience", "audience", claims.Audience, "expected", expectedAudience)
 			http.Error(w, "invalid audience in token", http.StatusUnauthorized)
 			return

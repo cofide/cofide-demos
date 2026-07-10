@@ -16,12 +16,18 @@ import (
 const sessionCookieName = "bank_session"
 
 // session holds what bank-client needs about the signed-in user: enough to
-// display who's logged in, and the OIDC access token to forward as the
-// caller's identity when proxying chat questions to bank-agent.
+// display who's logged in, and the OIDC ID token to forward as the caller's
+// identity when proxying chat questions to bank-agent. The ID token, not the
+// access token, is forwarded: an access token's "aud" is only ever set if
+// bank-client explicitly requests a resource/audience during sign-in (it
+// doesn't), so Ory issues it with an empty "aud" — useless for Credex's RFC
+// 8693 subject-token audience check. An ID token's "aud" is mandatory per the
+// OIDC spec and always equals the client ID, which is also what AgentCore's
+// own inbound authorizer checks via allowed_clients (see agentcore.tf).
 type session struct {
-	Subject     string `json:"sub"`
-	Name        string `json:"name"`
-	AccessToken string `json:"accessToken"`
+	Subject string `json:"sub"`
+	Name    string `json:"name"`
+	IDToken string `json:"idToken"`
 }
 
 // sessionStore signs and verifies session cookies with an HMAC, so the

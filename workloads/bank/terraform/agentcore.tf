@@ -308,8 +308,14 @@ resource "aws_bedrockagentcore_agent_runtime" "bank_agent" {
   # the bank-agent -> bank-server hop.
   authorizer_configuration {
     custom_jwt_authorizer {
-      discovery_url   = var.oidc_discovery_url
-      allowed_clients = var.oidc_allowed_clients
+      discovery_url = var.oidc_discovery_url
+      # allowed_audience (checks the JWT's "aud" claim), not allowed_clients
+      # (checks a literal "client_id" claim): bank-client forwards its OIDC ID
+      # token, not its access token, as the bearer credential (see
+      # bank-client/session.go) — ID tokens always set "aud" to the client ID
+      # per the OIDC spec, but aren't guaranteed to carry a separate
+      # "client_id" claim, which is an access-token convention.
+      allowed_audience = var.oidc_allowed_clients
     }
   }
 

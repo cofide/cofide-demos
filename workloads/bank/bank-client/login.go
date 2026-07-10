@@ -93,9 +93,9 @@ func handleCallback(discovery *oidcDiscovery, httpClient *http.Client, clientID,
 		clearCookie(w, pkceCookieName)
 
 		sess := session{
-			Subject:     decodeUnverifiedClaim(tok.IDToken, "sub"),
-			Name:        decodeUnverifiedClaim(tok.IDToken, "name"),
-			AccessToken: tok.AccessToken,
+			Subject: decodeUnverifiedClaim(tok.IDToken, "sub"),
+			Name:    decodeUnverifiedClaim(tok.IDToken, "name"),
+			IDToken: tok.IDToken,
 		}
 		if sess.Name == "" {
 			sess.Name = decodeUnverifiedClaim(tok.IDToken, "email")

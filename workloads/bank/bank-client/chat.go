@@ -56,7 +56,7 @@ func handleChat(store *sessionStore, httpClient *http.Client, invokeURL string) 
 			return
 		}
 		agentReq.Header.Set("Content-Type", "application/json")
-		agentReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sess.AccessToken))
+		agentReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sess.IDToken))
 
 		resp, err := httpClient.Do(agentReq)
 		if err != nil {
