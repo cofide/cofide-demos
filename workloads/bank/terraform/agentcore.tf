@@ -162,18 +162,23 @@ resource "aws_iam_role_policy" "bank_agent_web_identity_token" {
 # was confirmed to work; see git history if that ever needs resurrecting).
 # It uses Credex's RFC 7523 jwt-bearer path (exchange/oauth/authserver/
 # client_auth.go), which validates the AWS-issued token against a
-# trusted-issuer JWKS resolver rather than requiring a SPIFFE SVID — but this
-# still requires Credex to have this AWS account's web-identity-federation
-# issuer registered as a trusted issuer, which is not yet done (as of this
-# writing). The actor token, however, deliberately uses actorTokenContent =
-# "M2M" below rather than AWS_IAM_ID_TOKEN_JWT: Credex's actor_token_type
-# validation (exchange/oauth/handler/rfc8693/handler.go's
-# supportedActorTokenTypes) only accepts "access_token" or "jwt_spiffe" — a
-# raw external JWT is not a valid actor token, only a valid client
-# assertion/subject token. M2M makes AgentCore fetch a Credex-issued
-# client-credentials access token first (authenticating the same jwt-bearer
-# way) and present that as the actor token, which lands on the
-# "access_token" path.
+# trusted-issuer JWKS resolver rather than requiring a SPIFFE SVID — this
+# requires Credex to have this AWS account's web-identity-federation issuer
+# registered as a trusted issuer. The actor token uses actorTokenContent =
+# "AWS_IAM_ID_TOKEN_JWT" below: AgentCore presents its AWS-minted assertion
+# directly as actor_token (actor_token_type=urn:ietf:params:oauth:token-type:jwt),
+# with no separate client_credentials round trip first. This requires Credex's
+# actor_token_type validation (exchange/oauth/handler/rfc8693/handler.go's
+# supportedActorTokenTypes) to accept "jwt" as an actor token type, via the
+# same trusted-issuer mechanism used for subject tokens and client auth — not
+# supported on Credex's main branch as of this writing; requires the
+# "external JWT actor tokens" feature (see Credex's own git history/PRs).
+# The alternative, actorTokenContent = "M2M" (AgentCore first does a
+# client_credentials grant to get a Credex-issued access token, then presents
+# that as the actor token, landing on Credex's "access_token" actor path
+# instead), avoids that dependency at the cost of a second round trip and a
+# second exchange policy — see git history if reverting to that is ever
+# needed.
 #
 # terraform-provider-aws 6.53.0 (the latest available at the time this was
 # written) doesn't expose client_authentication_method or
@@ -220,11 +225,11 @@ locals {
       onBehalfOfTokenExchangeConfig = {
         grantType = "TOKEN_EXCHANGE"
         tokenExchangeGrantTypeConfig = {
-          # Not AWS_IAM_ID_TOKEN_JWT: Credex only accepts "access_token" or
-          # "jwt_spiffe" as actor_token_type (see comment above). M2M has
-          # AgentCore fetch a Credex-issued access token via
-          # client-credentials first, landing on the "access_token" path.
-          actorTokenContent = "M2M"
+          # AgentCore presents its AWS-minted assertion directly as the RFC
+          # 8693 actor_token (see comment above) — a single Credex round trip,
+          # not the two-call M2M pattern. Requires Credex to accept "jwt" as
+          # an actor_token_type (see comment above).
+          actorTokenContent = "AWS_IAM_ID_TOKEN_JWT"
         }
       }
     }

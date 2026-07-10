@@ -56,11 +56,6 @@ oidc:
 bankAgent:
   invokeUrl: ""
 
-session:
-  # Signs bank-client's session cookie. Change before deploying to a shared
-  # cluster.
-  secret: "changeme-session-secret"
-
 server:
   clientApiPort: 8443
   # bank-lambda and bank-agent (both running in AWS) share this listener —

@@ -48,10 +48,10 @@ def handler(event, context):
     auth_mode = os.environ.get("AUTH_MODE", "static")
 
     if auth_mode == "spiffe":
-        logger.info("Authenticating to bank-server mechanism=jwt_svid caller=bank-lambda")
+        logger.info("Authenticating to bank-server auth_method=jwt-svid caller=bank-lambda")
         token = _exchange_for_jwt_svid()
     elif auth_mode == "static":
-        logger.info("Authenticating to bank-server mechanism=static caller=bank-lambda")
+        logger.info("Authenticating to bank-server auth_method=static-secret caller=bank-lambda")
         token = os.environ["STATIC_WEBHOOK_API_KEY"]
     else:
         raise ValueError(f"invalid AUTH_MODE: {auth_mode}")

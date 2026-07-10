@@ -57,3 +57,10 @@ build-bank:
 # see workloads/bank/scripts/build-bank-agent.sh --help for options.
 build-bank-agent:
   workloads/bank/scripts/build-bank-agent.sh --tag $RELEASE_TAG
+
+# Runs a local web page tailing bank-client/bank-server (kubectl) and
+# bank-lambda/bank-agent (CloudWatch) logs side by side, for demos — see
+# workloads/bank/logs-dashboard --help for options (e.g. --kube-context,
+# --lambda-function-name).
+bank-logs-dashboard *args:
+  go run ./workloads/bank/logs-dashboard {{args}}

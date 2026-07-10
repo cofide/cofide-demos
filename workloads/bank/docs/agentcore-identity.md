@@ -148,12 +148,26 @@ trust* — an AWS STS-issued, IAM-role-scoped JWT, rather than a SPIFFE SVID.
   is not yet done (as of this writing).
 - **Actor tokens**: Credex's `actor_token_type` originally only accepted
   `access_token`/`jwt_spiffe` — a raw external JWT (what
-  `AWS_IAM_ID_TOKEN_JWT` produces directly) wasn't a valid actor token,
-  which is why `agentcore.tf` uses `actorTokenContent = "M2M"` (an extra
-  client-credentials round trip) rather than presenting it directly.
-  Credex has since gained support for a plain external JWT as an actor
-  token too, closing that gap — but `bank-agent`'s config deliberately
-  still uses the two-call M2M flow for now, pending further discussion.
+  `AWS_IAM_ID_TOKEN_JWT` produces directly) wasn't a valid actor token, so
+  `agentcore.tf` initially used `actorTokenContent = "M2M"` (an extra
+  client-credentials round trip: AgentCore first authenticates the same way
+  to get a Credex-issued access token, then presents *that* as the actor
+  token, landing on Credex's `access_token` actor path instead of needing a
+  raw-JWT one). Credex has since gained support for a plain external JWT as
+  an actor token (via the same trusted-issuer mechanism used for subject
+  tokens and client auth), and `agentcore.tf` now uses
+  `actorTokenContent = "AWS_IAM_ID_TOKEN_JWT"` to take advantage of it — a
+  single Credex call instead of two, and one exchange policy instead of two
+  (no policy is needed any more for the client-credentials leg, since it no
+  longer happens). This also meant fixing a Credex scope-checking assumption
+  that only mattered once external JWTs could be subject tokens for a scoped
+  exchange: `AllowUpscope` (which lets a matched policy's `outbound_scopes`
+  determine granted scope rather than requiring the subject token to already
+  carry a matching `scope` claim) previously only covered `id_token`/
+  `jwt_spiffe` subject tokens; AgentCore forwards the customer's OIDC ID
+  token typed generically as `jwt` (not literally `id_token`), and ID tokens
+  never carry a `scope` claim, so this needed extending to cover `jwt`
+  subject tokens too.
 
 ## Still true
 

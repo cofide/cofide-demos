@@ -29,16 +29,16 @@ func staticAuthMiddleware(caller, expectedKey string, next http.HandlerFunc) htt
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
-			slog.Warn("Rejected request", "mechanism", "static", "caller", caller, "reason", "missing bearer token")
+			slog.Warn("Rejected request", "auth_method", "static-secret", "caller", caller, "reason", "missing bearer token")
 			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
 			return
 		}
 		if subtle.ConstantTimeCompare([]byte(token), []byte(expectedKey)) != 1 {
-			slog.Warn("Rejected request", "mechanism", "static", "caller", caller, "reason", "wrong API key")
+			slog.Warn("Rejected request", "auth_method", "static-secret", "caller", caller, "reason", "wrong API key")
 			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
 			return
 		}
-		slog.Info("Authorised request", "mechanism", "static", "caller", caller)
+		slog.Info("Authorised request", "auth_method", "static-secret", "caller", caller)
 		next(w, r)
 	}
 }
@@ -54,12 +54,12 @@ func staticAgentAuthMiddleware(expectedKey string, next http.HandlerFunc) http.H
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
-			slog.Warn("Rejected request", "mechanism", "static", "caller", "bank-agent", "reason", "missing bearer token")
+			slog.Warn("Rejected request", "auth_method", "static-secret", "caller", "bank-agent", "reason", "missing bearer token")
 			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
 			return
 		}
 		if subtle.ConstantTimeCompare([]byte(token), []byte(expectedKey)) != 1 {
-			slog.Warn("Rejected request", "mechanism", "static", "caller", "bank-agent", "reason", "wrong API key")
+			slog.Warn("Rejected request", "auth_method", "static-secret", "caller", "bank-agent", "reason", "wrong API key")
 			http.Error(w, "invalid or missing API key", http.StatusUnauthorized)
 			return
 		}
@@ -67,7 +67,7 @@ func staticAgentAuthMiddleware(expectedKey string, next http.HandlerFunc) http.H
 		if onBehalfOf == "" {
 			onBehalfOf = "unknown"
 		}
-		slog.Info("Authorised request", "mechanism", "static", "caller", "bank-agent", "on_behalf_of_asserted_unverified", onBehalfOf)
+		slog.Info("Authorised request", "auth_method", "static-secret", "caller", "bank-agent", "on_behalf_of_asserted_unverified", onBehalfOf)
 		next(w, r)
 	}
 }
@@ -80,25 +80,25 @@ func jwtSVIDAuthMiddleware(wlClient *workloadapi.Client, audience string, author
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
-			slog.Warn("Rejected request", "mechanism", "jwt_svid", "caller", "bank-lambda", "reason", "missing bearer token")
+			slog.Warn("Rejected request", "auth_method", "jwt-svid", "caller", "bank-lambda", "reason", "missing bearer token")
 			http.Error(w, "no token provided", http.StatusUnauthorized)
 			return
 		}
 
 		svid, err := wlClient.ValidateJWTSVID(r.Context(), token, audience)
 		if err != nil {
-			slog.Warn("Rejected request", "mechanism", "jwt_svid", "caller", "bank-lambda", "reason", "invalid JWT-SVID", "error", err)
+			slog.Warn("Rejected request", "auth_method", "jwt-svid", "caller", "bank-lambda", "reason", "invalid JWT-SVID", "error", err)
 			http.Error(w, fmt.Sprintf("invalid token: %s", err), http.StatusUnauthorized)
 			return
 		}
 
 		if err := matcher(svid.ID); err != nil {
-			slog.Warn("Rejected request", "mechanism", "jwt_svid", "caller", "bank-lambda", "reason", "unauthorized SPIFFE ID", "spiffe_id", svid.ID.String())
+			slog.Warn("Rejected request", "auth_method", "jwt-svid", "caller", "bank-lambda", "reason", "unauthorized SPIFFE ID", "spiffe_id", svid.ID.String())
 			http.Error(w, "unauthorized SPIFFE ID", http.StatusForbidden)
 			return
 		}
 
-		slog.Info("Authorised request", "mechanism", "jwt_svid", "caller", "bank-lambda", "spiffe_id", svid.ID.String())
+		slog.Info("Authorised request", "auth_method", "jwt-svid", "caller", "bank-lambda", "spiffe_id", svid.ID.String())
 		next(w, r)
 	}
 }
@@ -112,10 +112,10 @@ func jwtSVIDAuthMiddleware(wlClient *workloadapi.Client, audience string, author
 func loggingAuthorizer(caller string, inner tlsconfig.Authorizer) tlsconfig.Authorizer {
 	return func(id spiffeid.ID, verifiedChains [][]*x509.Certificate) error {
 		if err := inner(id, verifiedChains); err != nil {
-			slog.Warn("Rejected mTLS handshake", "mechanism", "mtls", "caller", caller, "spiffe_id", id.String(), "error", err)
+			slog.Warn("Rejected mTLS handshake", "auth_method", "mtls", "caller", caller, "spiffe_id", id.String(), "error", err)
 			return err
 		}
-		slog.Info("Authorised mTLS handshake", "mechanism", "mtls", "caller", caller, "spiffe_id", id.String())
+		slog.Info("Authorised mTLS handshake", "auth_method", "mtls", "caller", caller, "spiffe_id", id.String())
 		return nil
 	}
 }

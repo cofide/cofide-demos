@@ -305,3 +305,15 @@ terraform apply \
 ```
 
 Invoke `bank-lambda` again and reload the dashboard — the header badge flips from "Connected via static secret" to "Connected via SPIFFE". See `docs/agentcore-identity.md` for the mechanics of `bank-agent`'s Credex integration.
+
+## Logs dashboard
+
+`just bank-logs-dashboard` runs a small local web page (`workloads/bank/logs-dashboard`)
+that tails all four workloads' logs side by side — `bank-client`/`bank-server` via
+`kubectl logs -f`, `bank-lambda`/`bank-agent` via CloudWatch — so a live demo doesn't
+need switching between terminal tabs and the CloudWatch console. It requires no new
+infrastructure: it just runs read-only `kubectl`/CloudWatch calls locally using
+whatever kube-context and AWS credentials you already have active. See
+`workloads/bank/logs-dashboard --help` (or `just bank-logs-dashboard -- --help`) for
+overriding the kube-context, deployment names, Lambda function name, or agent log
+group if your deployment doesn't use the Terraform defaults.

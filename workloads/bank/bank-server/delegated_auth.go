@@ -148,34 +148,34 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r)
 		if !ok {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "missing bearer token")
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "missing bearer token")
 			http.Error(w, "no token provided", http.StatusUnauthorized)
 			return
 		}
 
 		jwks, err := jwksFetcher.GetJWKS()
 		if err != nil {
-			slog.Error("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed to fetch Credex JWKS", "error", err)
+			slog.Error("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed to fetch Credex JWKS", "error", err)
 			http.Error(w, "unable to fetch JWKS", http.StatusServiceUnavailable)
 			return
 		}
 
 		tok, err := jwt.ParseSigned(token, allowedSignatureAlgs)
 		if err != nil {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed to parse token", "error", err)
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed to parse token", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		var claims delegatedClaims
 		if err := tok.Claims(jwks, &claims); err != nil {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed signature verification against Credex JWKS", "error", err)
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed signature verification against Credex JWKS", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
 		if err := claims.ValidateWithLeeway(jwt.Expected{Time: time.Now()}, 0); err != nil {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "failed time validation", "error", err)
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed time validation", "error", err)
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -191,18 +191,18 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 		// additionally constrains which audience a token must target when one
 		// is present.
 		if len(claims.Audience) > 0 && !slices.Contains([]string(claims.Audience), expectedAudience) {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "wrong audience", "audience", claims.Audience, "expected", expectedAudience)
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "wrong audience", "audience", claims.Audience, "expected", expectedAudience)
 			http.Error(w, "invalid audience in token", http.StatusUnauthorized)
 			return
 		}
 
 		if claims.Act == nil || claims.Act.Sub == "" {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "missing act claim")
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "missing act claim")
 			http.Error(w, "missing act claim", http.StatusUnauthorized)
 			return
 		}
 		if claims.Act.Sub != authorizedActor {
-			slog.Warn("Rejected request", "mechanism", "delegated_jwt", "caller", "bank-agent", "reason", "unauthorized actor", "actor", claims.Act.Sub)
+			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "unauthorized actor", "actor", claims.Act.Sub)
 			http.Error(w, "unauthorized actor", http.StatusForbidden)
 			return
 		}
@@ -211,7 +211,7 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 		if onBehalfOf == "" {
 			onBehalfOf = "unknown"
 		}
-		slog.Info("Authorised request", "mechanism", "delegated_jwt", "caller", "bank-agent", "on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub)
+		slog.Info("Authorised request", "auth_method", "delegated-jwt", "caller", "bank-agent", "on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub)
 
 		next(w, r)
 	}

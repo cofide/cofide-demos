@@ -54,9 +54,11 @@ spec:
             - name: SERVER_SPIFFE_ID
               value: {{ required "spiffe.serverSpiffeId is required when authMode=spiffe" .Values.spiffe.serverSpiffeId | quote }}
             {{- end }}
+          {{- if eq .Values.authMode "static" }}
           envFrom:
             - secretRef:
                 name: bank-client-auth
+          {{- end }}
           {{- if eq .Values.authMode "spiffe" }}
           volumeMounts:
             - name: spiffe-workload-api

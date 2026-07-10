@@ -93,13 +93,13 @@ def build_agent(on_behalf_of: str, workload_access_token: str) -> Agent:
             headers["Authorization"] = f"Bearer {os.environ['STATIC_AGENT_API_KEY']}"
             headers["X-On-Behalf-Of"] = on_behalf_of
             logger.info(
-                "Calling bank-server mechanism=static caller=bank-agent on_behalf_of_asserted_unverified=%s",
+                "Calling bank-server auth_method=static-secret caller=bank-agent on_behalf_of_asserted_unverified=%s",
                 on_behalf_of,
             )
         elif AUTH_MODE == "spiffe":
             headers["Authorization"] = f"Bearer {_exchange_for_delegated_token(workload_access_token)}"
             logger.info(
-                "Calling bank-server mechanism=delegated_jwt caller=bank-agent on_behalf_of_verified=%s",
+                "Calling bank-server auth_method=delegated-jwt caller=bank-agent on_behalf_of_verified=%s",
                 on_behalf_of,
             )
         else:
