@@ -1,0 +1,124 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="4UXRvz1Lyuhwm6S0kQCX">
+    <mxGraphModel dx="2421" dy="1950" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-34" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" value="&lt;b&gt;Serverless&lt;/b&gt;" vertex="1">
+          <mxGeometry height="230" width="310" x="780" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-1" parent="1" style="outlineConnect=0;dashed=0;verticalLabelPosition=top;verticalAlign=bottom;align=center;html=1;shape=mxgraph.aws3.lambda_function;fillColor=#F58534;gradientColor=none;labelPosition=center;" value="&lt;b&gt;bank-lambda&lt;br&gt;&lt;/b&gt;Submits new transactions" vertex="1">
+          <mxGeometry height="72" width="69" x="920" y="474" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-23" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="78" width="140" x="-153" y="468" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-21" parent="4NaB_4r0OV78wZAj0hR3-23" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3D;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.user;" value="" vertex="1">
+          <mxGeometry height="78" width="78" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-22" parent="4NaB_4r0OV78wZAj0hR3-23" style="sketch=0;html=1;pointerEvents=1;dashed=0;fillColor=#036897;strokeColor=#ffffff;strokeWidth=2;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;shape=mxgraph.cisco.computers_and_peripherals.web_browser;" value="" vertex="1">
+          <mxGeometry height="64" width="62" x="78" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-24" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="250" width="510" x="130" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-13" parent="4NaB_4r0OV78wZAj0hR3-24" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" value="&lt;b&gt;Kubernetes Cluster&lt;/b&gt;" vertex="1">
+          <mxGeometry height="230" width="490" x="20" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-3" parent="4NaB_4r0OV78wZAj0hR3-24" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://raw.githubusercontent.com/kubernetes/kubernetes/refs/heads/master/logo/logo.svg;" value="" vertex="1">
+          <mxGeometry height="70" width="72.08" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-11" connectable="0" parent="4NaB_4r0OV78wZAj0hR3-24" style="group" value="" vertex="1">
+          <mxGeometry height="90" width="140" x="60" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-8" parent="4NaB_4r0OV78wZAj0hR3-11" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;bank-client&lt;/b&gt;&lt;br&gt;Serves UI" vertex="1">
+          <mxGeometry height="60" width="120" x="20" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-4" parent="4NaB_4r0OV78wZAj0hR3-11" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#2875E2;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=pod" value="" vertex="1">
+          <mxGeometry height="48" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-12" connectable="0" parent="4NaB_4r0OV78wZAj0hR3-24" style="group" value="" vertex="1">
+          <mxGeometry height="90" width="140" x="330" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-9" parent="4NaB_4r0OV78wZAj0hR3-12" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;bank-server&lt;/b&gt;&lt;br&gt;Holds ledger" vertex="1">
+          <mxGeometry height="60" width="120" x="20" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-10" parent="4NaB_4r0OV78wZAj0hR3-12" style="aspect=fixed;sketch=0;html=1;dashed=0;whitespace=wrap;verticalLabelPosition=bottom;verticalAlign=top;fillColor=#2875E2;strokeColor=#ffffff;points=[[0.005,0.63,0],[0.1,0.2,0],[0.9,0.2,0],[0.5,0,0],[0.995,0.63,0],[0.72,0.99,0],[0.5,1,0],[0.28,0.99,0]];shape=mxgraph.kubernetes.icon2;prIcon=pod" value="" vertex="1">
+          <mxGeometry height="48" width="50" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-27" edge="1" parent="4NaB_4r0OV78wZAj0hR3-24" source="4NaB_4r0OV78wZAj0hR3-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="4NaB_4r0OV78wZAj0hR3-9" value="Fetches transactions&lt;br&gt;summary">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-40" parent="4NaB_4r0OV78wZAj0hR3-24" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Static API key" vertex="1">
+          <mxGeometry height="30" width="90" x="230" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-25" edge="1" parent="1" source="4NaB_4r0OV78wZAj0hR3-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="4NaB_4r0OV78wZAj0hR3-8" value="Logs in through IdP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-26" edge="1" parent="1" source="4NaB_4r0OV78wZAj0hR3-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="4NaB_4r0OV78wZAj0hR3-9" value="Submits new transaction">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-29" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="170" width="270" x="300" y="757" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-35" parent="4NaB_4r0OV78wZAj0hR3-29" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" value="&lt;b&gt;Agent Platforms&lt;/b&gt;" vertex="1">
+          <mxGeometry height="200" width="330" x="-60" y="-30" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-7" parent="4NaB_4r0OV78wZAj0hR3-29" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://www.missioncloud.com/hubfs/AgentCore-icon3-1.png;fontStyle=1" value="bank-agent" vertex="1">
+          <mxGeometry height="87.5" width="87.5" x="66.25" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-14" parent="4NaB_4r0OV78wZAj0hR3-29" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Answers user queries about transactions" vertex="1">
+          <mxGeometry height="30" width="220" y="102.5" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-44" parent="4NaB_4r0OV78wZAj0hR3-29" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Agent can re-use user token" vertex="1">
+          <mxGeometry height="30" width="110" x="-50" y="57.5" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-30" edge="1" parent="1" source="4NaB_4r0OV78wZAj0hR3-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;verticalAlign=bottom;" target="4NaB_4r0OV78wZAj0hR3-7" value="Invokes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-31" edge="1" parent="1" source="4NaB_4r0OV78wZAj0hR3-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;verticalAlign=bottom;" target="4NaB_4r0OV78wZAj0hR3-9" value="Fetches transactions&lt;br&gt;summary">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-32" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="340" width="340" x="750" y="-10" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-20" connectable="0" parent="4NaB_4r0OV78wZAj0hR3-32" style="group" value="" vertex="1">
+          <mxGeometry height="340" width="340" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-18" parent="4NaB_4r0OV78wZAj0hR3-20" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" value="&lt;b&gt;Virtual Machine / Bare Metal&lt;/b&gt;" vertex="1">
+          <mxGeometry height="230" width="310" x="30" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-15" parent="4NaB_4r0OV78wZAj0hR3-20" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.ec2;fillColor=#F58534;gradientColor=none;" value="" vertex="1">
+          <mxGeometry height="93" width="76.5" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-17" parent="4NaB_4r0OV78wZAj0hR3-20" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;b&gt;bank-fraud-checker&lt;/b&gt;&lt;br&gt;Checks transactions for fraud" vertex="1">
+          <mxGeometry height="80" width="223.5" x="76.5" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-16" parent="4NaB_4r0OV78wZAj0hR3-20" style="image;sketch=0;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/mscae/Docker.svg;" value="" vertex="1">
+          <mxGeometry height="41" width="50" x="60" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-37" parent="4NaB_4r0OV78wZAj0hR3-20" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cdn.creazilla.com/icons/3259486/pid-icon-md.png;" value="" vertex="1">
+          <mxGeometry height="47.28" width="34" x="270" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-19" connectable="0" parent="4NaB_4r0OV78wZAj0hR3-32" style="group" value="" vertex="1">
+          <mxGeometry height="100" width="260" x="80" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-36" parent="4NaB_4r0OV78wZAj0hR3-19" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://brand.systemd.io/assets/svg/systemd-light-vertical-color.svg;clipPath=inset(31.5% 31% 27% 31.67%);" value="" vertex="1">
+          <mxGeometry height="50" width="67.47" x="75.26999999999998" y="-4.5" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-28" edge="1" parent="1" source="4NaB_4r0OV78wZAj0hR3-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="4NaB_4r0OV78wZAj0hR3-9" value="Fetches and updates&lt;br&gt;transactions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-41" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Static API key" vertex="1">
+          <mxGeometry height="30" width="90" x="550" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-42" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Static API key" vertex="1">
+          <mxGeometry height="30" width="90" x="680" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="4NaB_4r0OV78wZAj0hR3-43" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Static API key" vertex="1">
+          <mxGeometry height="30" width="90" x="560" y="250" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
