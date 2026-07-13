@@ -4,7 +4,7 @@ A more realistic demo than `ping-pong`: a small bank dashboard a customer can vi
 
 Data is static/in-memory only for now; `bank-server` seeds one account and a handful of transactions on startup and resets on restart.
 
-See [`docs/agentcore-identity.md`](docs/agentcore-identity.md) for a deeper comparison between `bank-agent`'s use of Credex and AWS Bedrock AgentCore's own native identity/delegation features — useful background for demo Q&A.
+See [`docs/agentcore-identity.md`](docs/agentcore-identity.md) for a deeper comparison between `bank-agent`'s use of Credex and AWS Bedrock AgentCore's own native identity/delegation features, and [`docs/node-observer-workload.md`](docs/node-observer-workload.md) for `bank-fraud-checker`'s relationship to `cofide-node-observer` — useful background for demo Q&A.
 
 ## What it demonstrates
 
@@ -12,6 +12,7 @@ See [`docs/agentcore-identity.md`](docs/agentcore-identity.md) for a deeper comp
 - **`bank-server`**: an in-memory ledger with three inbound surfaces — a summary API for `bank-client`, a webhook for `bank-lambda` to post new transactions, and a separate summary API for `bank-agent`.
 - **`bank-lambda`**: a Python Lambda, manually invoked to simulate a payments network posting a transaction.
 - **`bank-agent`**: a Python AI agent hosted on AWS Bedrock AgentCore that answers a signed-in customer's questions about their account. Extends the "every hop gets its own identity" story to an AI agent, and specifically demonstrates that Cofide Credex remains necessary even for a workload built entirely from AWS-native primitives (AgentCore Identity's own On-Behalf-Of token exchange) — see `docs/agentcore-identity.md` for the full comparison. A core part of the demo, deployed by the same scripts as everything else — see "bank-agent + OIDC bootstrap (one-time)" below for its one extra bootstrap requirement (its container image must exist before it can be deployed).
+- **`bank-fraud-checker`**: a small Go poller that lists `bank-server`'s transactions every 20s and marks any unchecked ones as reviewed for fraud. Unlike every other workload here, it doesn't run in Kubernetes or on AWS-managed compute — it's a plain Docker container on a VM, alongside a real, co-located SPIRE agent, made visible to Cofide Connect by **cofide-node-observer** (the non-Kubernetes analog of cofide-observer). Because it has genuine SPIFFE Workload API access on that VM, its `spiffe` mode fetches a JWT-SVID directly — no Credex bridging needed, unlike `bank-lambda`/`bank-agent`, which run on AWS compute with no Workload API access at all. It isn't deployed by this repo's scripts/Terraform at all — see "Deployment" below.
 
 Every hop is controlled by the same `AUTH_MODE` toggle, always presented as `Authorization: Bearer <token>` so handler logic is uniform regardless of mode:
 
@@ -20,8 +21,9 @@ Every hop is controlled by the same `AUTH_MODE` toggle, always presented as `Aut
 | `bank-client` → `bank-server` | Plain HTTP, bearer pre-shared API key | HTTPS, SPIFFE X.509-SVID mTLS |
 | `bank-lambda` → `bank-server` | Plain HTTP, bearer pre-shared API key | Plain HTTP, bearer JWT-SVID minted by **Cofide Credex** |
 | `bank-agent` → `bank-server` | Plain HTTP, bearer pre-shared API key + asserted `X-On-Behalf-Of` header | Plain HTTP, bearer delegated token minted by **Cofide Credex**'s On-Behalf-Of exchange, verified `sub` (customer) claim |
+| `bank-fraud-checker` → `bank-server` | Plain HTTP, bearer pre-shared API key | Plain HTTP, bearer JWT-SVID fetched directly from a co-located SPIRE agent — no Credex involved |
 
-In `spiffe` mode, `bank-lambda` obtains an AWS web identity token (`sts:GetWebIdentityToken`) and exchanges it with Cofide Credex for a JWT-SVID, which it then presents to `bank-server`. `bank-server` validates that JWT-SVID against its local SPIFFE Workload API, the same way `workloads/ping-pong-jwt`'s server does.
+In `spiffe` mode, `bank-lambda` obtains an AWS web identity token (`sts:GetWebIdentityToken`) and exchanges it with Cofide Credex for a JWT-SVID, which it then presents to `bank-server`. `bank-server` validates that JWT-SVID against its local SPIFFE Workload API, the same way `workloads/ping-pong-jwt`'s server does. `bank-fraud-checker` follows the same validation path on `bank-server`'s side, but skips the Credex exchange entirely on its own side — it runs on a VM with a real, co-located SPIRE agent, so it can fetch a JWT-SVID straight from the local Workload API, the same way `bank-client` fetches an X.509-SVID. Credex exists to bridge identity for platforms that have no Workload API (AWS Lambda, Bedrock AgentCore); a VM with an agent installed doesn't need that bridge at all.
 
 Signing in to chat with `bank-agent` is a separate, orthogonal axis handled by an **OIDC IdP** (Ory, Auth0, Okta, ... — nothing in this integration is IdP-specific), independent of `AUTH_MODE` — a customer logs in via `bank-client` in both modes; what changes is only how `bank-agent` proves its own identity to `bank-server` afterwards. In `spiffe` mode this becomes a genuine delegated call: Credex mints a token with the customer as subject and `bank-agent` as actor (RFC 8693), and `bank-server` logs the customer identity as cryptographically *verified* rather than merely *asserted*.
 
@@ -35,6 +37,8 @@ sequenceDiagram
     participant Browser
     participant IdP as OIDC IdP
     participant Agent as bank-agent (AgentCore)
+    participant FC as bank-fraud-checker (VM)
+    participant SA as SPIRE agent (co-located)
 
     Note over Lambda,Server: static mode
     Lambda->>Server: POST /webhook/transactions (Bearer static key)
@@ -73,6 +77,21 @@ sequenceDiagram
 
     Agent-->>Client: answer
     Client-->>Browser: answer
+
+    Note over FC,Server: static mode
+    FC->>Server: GET /api/fraud-check (Bearer static key)
+    Server-->>FC: unchecked transactions
+    FC->>Server: POST /api/fraud-check (Bearer static key)
+    Server-->>FC: 202 Accepted {checked: N}
+
+    Note over FC,Server: spiffe mode — no Credex involved
+    FC->>SA: Fetch JWT-SVID
+    SA-->>FC: JWT-SVID
+    FC->>Server: GET /api/fraud-check (Bearer JWT-SVID)
+    Server->>WA: ValidateJWTSVID
+    Server-->>FC: unchecked transactions
+    FC->>Server: POST /api/fraud-check (Bearer JWT-SVID)
+    Server-->>FC: 202 Accepted {checked: N}
 ```
 
 ## Configuration
@@ -89,8 +108,10 @@ The agent-related variables below are optional even in their "if" mode — `bank
 | `STATIC_CLIENT_API_KEY` | If `static` | — | Bearer key expected from `bank-client` |
 | `STATIC_WEBHOOK_API_KEY` | If `static` | — | Bearer key expected from `bank-lambda` |
 | `STATIC_AGENT_API_KEY` | No | — | Bearer key expected from `bank-agent`; its route isn't registered if unset |
+| `STATIC_FRAUD_CHECK_API_KEY` | If `static` | — | Bearer key expected from `bank-fraud-checker` |
 | `CLIENT_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID for `bank-client` |
 | `LAMBDA_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-lambda` |
+| `FRAUD_CHECKER_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-fraud-checker` |
 | `AGENT_AUTHORIZED_ACTOR` | No | — | Authorised actor (delegated token's `act.sub`) for `bank-agent` — not a SPIFFE ID, since `bank-agent` is an AgentCore Runtime workload with no SPIFFE identity; it's the AWS IAM execution role ARN that ends up there (see `terraform output bank_agent_execution_role_arn`). Its route isn't registered if unset |
 | `CREDEX_DISCOVERY_URL` | No | — | Credex OIDC discovery URL, used to fetch the JWKS that validates `bank-agent`'s delegated tokens; its route isn't registered if unset |
 | `AGENT_TOKEN_AUDIENCE` | No | `bank-server-agent-api` | Expected `aud` claim on `bank-agent`'s delegated tokens |
@@ -148,6 +169,18 @@ Hosted on AWS Bedrock AgentCore Runtime, not in this cluster — see "bank-agent
 
 Inbound auth (validating the signed-in customer's OIDC token) is configured on the AgentCore Runtime resource itself (`authorizer_configuration`), not via environment variables — see `docs/agentcore-identity.md`.
 
+### bank-fraud-checker
+
+Runs as a plain Docker container on a VM — not in this cluster, not on AWS-managed compute, and not deployed by anything in this repo (see "Deployment" below for where it actually lives).
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `AUTH_MODE` | No | `static` | `static` or `spiffe` |
+| `BANK_SERVER_FRAUD_CHECK_URL` | Yes | — | Full URL of `bank-server`'s fraud-check endpoint, reachable from the VM |
+| `POLL_INTERVAL` | No | `20s` | How often to list transactions and mark unchecked ones as reviewed |
+| `STATIC_API_KEY` | If `static` | — | Bearer key sent to `bank-server` |
+| `SPIFFE_ENDPOINT_SOCKET` | If `spiffe` | — | SPIFFE Workload API socket path — points at the SPIRE agent co-located on the same VM, fetched directly with no Credex exchange involved |
+
 ## Deployment
 
 ### Using the scripts (recommended for a live demo)
@@ -185,6 +218,8 @@ cd workloads/bank
   --kube-context <your-kubectl-context> \
   --client-api-key <client-key> \
   --webhook-api-key <webhook-key> \
+  --agent-api-key <agent-key> \
+  --fraud-check-api-key <fraud-check-key> \
   --aws-region <region> \
   --webhook-service-type NodePort \
   --webhook-node-port 30052 \
@@ -201,11 +236,44 @@ Once you've onboarded the cluster into Cofide Connect and have a reachable Crede
   --server-spiffe-id spiffe://<trust-domain>/bank/server \
   --client-spiffe-id spiffe://<trust-domain>/bank/client \
   --lambda-spiffe-id spiffe://<trust-domain>/bank/lambda \
+  --fraud-checker-spiffe-id spiffe://<trust-domain>/vm/bank-fraud-checker \
   --credex-url <cofide-credex-token-exchange-url> \
   --aws-region <region>
 ```
 
 Run either script with `--help` for the full flag list. They call `terraform apply` interactively (no `-auto-approve`), so you'll see and confirm the plan before anything changes.
+
+#### bank-fraud-checker: deployed from a different repo
+
+Unlike every other workload above, `bank-fraud-checker` isn't built, pushed, or deployed by anything in this repo — it runs as a third Docker container on the EC2 instance `cofide-connect`'s `cloud-discovery-poc/cofide-demo-infra/node-observer-instance` Terraform module provisions for `cofide-node-observer` demos (alongside a SPIRE agent and `cofide-node-observer` itself). That module has its own `bank_fraud_checker_auth_mode` variable, so it participates in the same static/spiffe toggle as everything else here — but since it's a *separate* Terraform state in a different repo, nothing keeps it automatically in sync with whichever mode `bank-server` is currently deployed in via `deploy-static.sh`/`toggle-spiffe.sh` above. Keep the two in sync by hand.
+
+Common to both modes:
+
+1. Build and push its image: `scripts/build-bank-fraud-checker.sh` (auto-detects the ECR repository from a sibling `cofide-connect` checkout — see its `--help`).
+2. In `cofide-connect`, apply the `bank-fraud-checker-ecr` module (once), then apply `node-observer-instance` with `bank_fraud_checker_image_tag` set to the tag the build script just pushed.
+
+**If `bank-server` is in `static` mode** (i.e. you've deployed with `deploy-static.sh --fraud-check-api-key <key>` and haven't run `toggle-spiffe.sh` yet), apply `node-observer-instance` with:
+
+```bash
+terraform apply -var-file=vars.tfvars \
+  -var='bank_fraud_checker_auth_mode=static' \
+  -var='bank_fraud_checker_static_api_key=<same key as deploy-static.sh --fraud-check-api-key>'
+```
+
+No SPIRE registration needed yet — in static mode `bank-fraud-checker` never touches the Workload API.
+
+**If `bank-server` is in `spiffe` mode** (deployed via `toggle-spiffe.sh`), first register a SPIRE entry for the container (the same "registration happens outside this repo" pattern as every SPIFFE ID above):
+
+```bash
+spire-server entry create \
+  -spiffeID spiffe://<trust-domain>/vm/bank-fraud-checker \
+  -parentID <this-instance's-node-alias-SPIFFE-ID> \
+  -selector docker:label:cofide.io/workload:bank-fraud-checker
+```
+
+then apply `node-observer-instance` with `-var='bank_fraud_checker_auth_mode=spiffe'`, and pass that same SPIFFE ID to `toggle-spiffe.sh --fraud-checker-spiffe-id` above.
+
+`bank-fraud-checker` is visibility-only from `cofide-node-observer`'s side regardless of auth mode — being detected and shown in Connect's workload inventory doesn't depend on which credential it's using to reach `bank-server`. See `docs/node-observer-workload.md` for why those are separate.
 
 ### Manual steps (what the scripts do)
 
@@ -278,7 +346,7 @@ kubectl -n bank rollout restart deployment/bank-client
 
 #### 4. Toggle to SPIFFE (after onboarding into Connect)
 
-Requires a cluster with SPIRE/Cofide Connect and the `csi.spiffe.io` CSI driver installed, as with every other SPIFFE demo in this repo, and the three SPIFFE IDs below already registered in your trust zone/Credex config (that registration happens outside this repo). `bank-agent` has no SPIFFE identity of its own (it's an AgentCore Runtime workload, not a k8s pod) — its authorized-actor value is its IAM execution role ARN, auto-detected from `terraform`'s own output below rather than registered anywhere.
+Requires a cluster with SPIRE/Cofide Connect and the `csi.spiffe.io` CSI driver installed, as with every other SPIFFE demo in this repo, and the four SPIFFE IDs below already registered in your trust zone/Credex config (that registration happens outside this repo — `bank-fraud-checker`'s is registered against the SPIRE agent co-located with it on its VM, see "Deployment" above for where that VM comes from). `bank-agent` has no SPIFFE identity of its own (it's an AgentCore Runtime workload, not a k8s pod) — its authorized-actor value is its IAM execution role ARN, auto-detected from `terraform`'s own output below rather than registered anywhere.
 
 ```bash
 helm upgrade bank ./chart/bank \
@@ -288,6 +356,7 @@ helm upgrade bank ./chart/bank \
   --set spiffe.serverSpiffeId=spiffe://<trust-domain>/bank/server \
   --set spiffe.clientSpiffeId=spiffe://<trust-domain>/bank/client \
   --set spiffe.lambdaSpiffeId=spiffe://<trust-domain>/bank/lambda \
+  --set spiffe.fraudCheckerSpiffeId=spiffe://<trust-domain>/vm/bank-fraud-checker \
   --set spiffe.agentAuthorizedActor="$(terraform -chdir=terraform output -raw bank_agent_execution_role_arn)" \
   --set credex.discoveryUrl=<cofide-credex-oidc-discovery-url, full form ending in /.well-known/openid-configuration>
 

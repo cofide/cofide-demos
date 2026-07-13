@@ -11,18 +11,22 @@ image:
   pullPolicy: Never
 
 # Only used when authMode is "spiffe". serverSpiffeId/clientSpiffeId/
-# lambdaSpiffeId must match the SPIFFE IDs registered for each workload in
-# your trust domain. agentAuthorizedActor is different: bank-agent (an
-# AgentCore Runtime workload) has no SPIFFE identity at all — it's the "sub"
-# claim AWS puts in the identity JWT it presents to Credex (i.e. bank-agent's
-# IAM execution role ARN, see terraform output bank_agent_execution_role_arn),
-# which is what ends up in a delegated token's "act.sub" for bank-server to
-# authorize.
+# lambdaSpiffeId/fraudCheckerSpiffeId must match the SPIFFE IDs registered for
+# each workload in your trust domain — fraudCheckerSpiffeId's is registered
+# manually against a SPIRE server co-located with bank-fraud-checker on its
+# VM (see workloads/bank/README.md), the same "registration happens outside
+# this repo" pattern as the other three. agentAuthorizedActor is different:
+# bank-agent (an AgentCore Runtime workload) has no SPIFFE identity at all —
+# it's the "sub" claim AWS puts in the identity JWT it presents to Credex
+# (i.e. bank-agent's IAM execution role ARN, see terraform output
+# bank_agent_execution_role_arn), which is what ends up in a delegated
+# token's "act.sub" for bank-server to authorize.
 spiffe:
   socketPath: unix:///spiffe-workload-api/spire-agent.sock
   serverSpiffeId: ""
   clientSpiffeId: ""
   lambdaSpiffeId: ""
+  fraudCheckerSpiffeId: ""
   agentAuthorizedActor: ""
 
 # Only used when authMode is "static". Change these before deploying to a
@@ -31,6 +35,7 @@ staticAuth:
   clientApiKey: "changeme-client-key"
   webhookApiKey: "changeme-webhook-key"
   agentApiKey: "changeme-agent-key"
+  fraudCheckApiKey: "changeme-fraud-check-key"
 
 # Cofide Credex's OIDC discovery endpoint, used by bank-server to validate
 # bank-agent's delegated tokens. Only used when authMode is "spiffe" —

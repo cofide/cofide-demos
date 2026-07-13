@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Toggle a running bank demo from "static" to "spiffe" auth mode: SPIFFE
-# X.509-SVID mTLS for bank-client<->bank-server, and a JWT-SVID minted by
-# Cofide Credex for bank-lambda->bank-server. Requires the cluster to already
-# have Cofide Connect/SPIRE and the csi.spiffe.io CSI driver installed, and a
-# reachable Credex instance.
+# X.509-SVID mTLS for bank-client<->bank-server, a JWT-SVID minted by Cofide
+# Credex for bank-lambda->bank-server, and a JWT-SVID fetched directly from a
+# co-located SPIRE agent for bank-fraud-checker->bank-server (no Credex
+# involved there — unlike bank-lambda, that workload has real Workload API
+# access). Requires the cluster to already have Cofide Connect/SPIRE and the
+# csi.spiffe.io CSI driver installed, and a reachable Credex instance.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,6 +21,7 @@ BOOTSTRAP_DIR="$(resolve_bootstrap_dir)"
 SERVER_SPIFFE_ID=""
 CLIENT_SPIFFE_ID=""
 LAMBDA_SPIFFE_ID=""
+FRAUD_CHECKER_SPIFFE_ID=""
 CREDEX_URL=""
 CREDEX_AUDIENCE="bank-server-webhook"
 CREDEX_DISCOVERY_URL=""
@@ -35,7 +38,7 @@ SKIP_KIND_LOAD=0
 usage() {
   cat <<EOF
 Usage: $(basename "$0") --kube-context <name> --server-spiffe-id <id> --client-spiffe-id <id> \\
-         --lambda-spiffe-id <id> --credex-url <url> --aws-region <region> \\
+         --lambda-spiffe-id <id> --fraud-checker-spiffe-id <id> --credex-url <url> --aws-region <region> \\
          [options]
 
 Required:
@@ -44,6 +47,11 @@ Required:
   --server-spiffe-id <id>   SPIFFE ID registered for bank-server, e.g. spiffe://example.org/bank/server
   --client-spiffe-id <id>   SPIFFE ID registered for bank-client, e.g. spiffe://example.org/bank/client
   --lambda-spiffe-id <id>   SPIFFE ID registered for bank-lambda, e.g. spiffe://example.org/bank/lambda
+  --fraud-checker-spiffe-id <id>
+                            SPIFFE ID registered for bank-fraud-checker, e.g.
+                            spiffe://example.org/vm/bank-fraud-checker — registered against the SPIRE
+                            agent co-located with it on its VM (see workloads/bank/README.md), not this
+                            cluster's trust domain necessarily, if they differ
   --credex-url <url>        Cofide Credex token exchange endpoint (skip with --skip-terraform)
   --aws-region <region>     AWS region for the Lambda and bank-agent (skip with --skip-terraform)
 
@@ -102,6 +110,7 @@ while [[ $# -gt 0 ]]; do
     --server-spiffe-id) SERVER_SPIFFE_ID="$2"; shift 2 ;;
     --client-spiffe-id) CLIENT_SPIFFE_ID="$2"; shift 2 ;;
     --lambda-spiffe-id) LAMBDA_SPIFFE_ID="$2"; shift 2 ;;
+    --fraud-checker-spiffe-id) FRAUD_CHECKER_SPIFFE_ID="$2"; shift 2 ;;
     --credex-url) CREDEX_URL="$2"; shift 2 ;;
     --credex-audience) CREDEX_AUDIENCE="$2"; shift 2 ;;
     --credex-discovery-url) CREDEX_DISCOVERY_URL="$2"; shift 2 ;;
@@ -137,6 +146,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
   require server-spiffe-id "$SERVER_SPIFFE_ID"
   require client-spiffe-id "$CLIENT_SPIFFE_ID"
   require lambda-spiffe-id "$LAMBDA_SPIFFE_ID"
+  require fraud-checker-spiffe-id "$FRAUD_CHECKER_SPIFFE_ID"
 
   echo "==> Detecting bank-agent's authorized actor (IAM execution role ARN) from terraform/ output"
   if ! AGENT_AUTHORIZED_ACTOR="$(terraform -chdir="$TERRAFORM_DIR" output -raw bank_agent_execution_role_arn 2>/dev/null)" || [[ -z "$AGENT_AUTHORIZED_ACTOR" ]]; then
@@ -165,6 +175,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     --set spiffe.serverSpiffeId="$SERVER_SPIFFE_ID" \
     --set spiffe.clientSpiffeId="$CLIENT_SPIFFE_ID" \
     --set spiffe.lambdaSpiffeId="$LAMBDA_SPIFFE_ID" \
+    --set spiffe.fraudCheckerSpiffeId="$FRAUD_CHECKER_SPIFFE_ID" \
     --set spiffe.agentAuthorizedActor="$AGENT_AUTHORIZED_ACTOR" \
     --set credex.discoveryUrl="$RESOLVED_CREDEX_DISCOVERY_URL"
 
@@ -228,7 +239,7 @@ should now read "Connected via SPIFFE":
     --payload '{"merchant": "Rail Delivery Group", "category": "Transport", "amountPence": -3450}' \\
     --cli-binary-format raw-in-base64-out out.json
 
-Note: this only works if ${SERVER_SPIFFE_ID:-<server-spiffe-id>}, ${CLIENT_SPIFFE_ID:-<client-spiffe-id>}
-and ${LAMBDA_SPIFFE_ID:-<lambda-spiffe-id>} are already registered in your trust zone/Credex config —
-that registration happens outside this repo.
+Note: this only works if ${SERVER_SPIFFE_ID:-<server-spiffe-id>}, ${CLIENT_SPIFFE_ID:-<client-spiffe-id>},
+${LAMBDA_SPIFFE_ID:-<lambda-spiffe-id>}, and ${FRAUD_CHECKER_SPIFFE_ID:-<fraud-checker-spiffe-id>} are
+already registered in your trust zone/Credex config — that registration happens outside this repo.
 EOF

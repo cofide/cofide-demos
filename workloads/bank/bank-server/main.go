@@ -18,7 +18,8 @@ const (
 	authModeStatic = "static"
 	authModeSPIFFE = "spiffe"
 
-	webhookAudience = "bank-server-webhook"
+	webhookAudience    = "bank-server-webhook"
+	fraudCheckAudience = "bank-server-fraud-check"
 )
 
 func main() {
@@ -29,18 +30,20 @@ func main() {
 }
 
 type Env struct {
-	AuthMode             string
-	ClientAPIAddress     string
-	WebhookAddress       string
-	SpiffeSocketPath     string
-	ClientSPIFFEID       string
-	LambdaSPIFFEID       string
-	AgentAuthorizedActor string
-	StaticClientAPIKey   string
-	StaticWebhookAPIKey  string
-	StaticAgentAPIKey    string
-	CredexDiscoveryURL   string
-	AgentTokenAudience   string
+	AuthMode               string
+	ClientAPIAddress       string
+	WebhookAddress         string
+	SpiffeSocketPath       string
+	ClientSPIFFEID         string
+	LambdaSPIFFEID         string
+	FraudCheckerSPIFFEID   string
+	AgentAuthorizedActor   string
+	StaticClientAPIKey     string
+	StaticWebhookAPIKey    string
+	StaticFraudCheckAPIKey string
+	StaticAgentAPIKey      string
+	CredexDiscoveryURL     string
+	AgentTokenAudience     string
 }
 
 func mustGetEnv(variable string) string {
@@ -74,6 +77,7 @@ func getEnv() *Env {
 	case authModeStatic:
 		env.StaticClientAPIKey = mustGetEnv("STATIC_CLIENT_API_KEY")
 		env.StaticWebhookAPIKey = mustGetEnv("STATIC_WEBHOOK_API_KEY")
+		env.StaticFraudCheckAPIKey = mustGetEnv("STATIC_FRAUD_CHECK_API_KEY")
 		// Optional, not mustGetEnv: bank-agent has its own separate
 		// deployment bootstrap (see workloads/bank/README.md), so
 		// bank-server must be able to start without it configured yet.
@@ -81,6 +85,7 @@ func getEnv() *Env {
 	case authModeSPIFFE:
 		env.ClientSPIFFEID = mustGetEnv("CLIENT_SPIFFE_ID")
 		env.LambdaSPIFFEID = mustGetEnv("LAMBDA_SPIFFE_ID")
+		env.FraudCheckerSPIFFEID = mustGetEnv("FRAUD_CHECKER_SPIFFE_ID")
 		env.AgentAuthorizedActor = getEnvWithDefault("AGENT_AUTHORIZED_ACTOR", "")
 		env.CredexDiscoveryURL = getEnvWithDefault("CREDEX_DISCOVERY_URL", "")
 		env.AgentTokenAudience = getEnvWithDefault("AGENT_TOKEN_AUDIENCE", "bank-server-agent-api")
@@ -97,12 +102,13 @@ func run(ctx context.Context, env *Env) error {
 
 	summaryHandler := handleSummary(ledger)
 	webhookHandler := handleWebhook(ledger)
+	fraudCheckHandler := handleFraudCheck(ledger)
 
 	switch env.AuthMode {
 	case authModeStatic:
-		return runStatic(env, summaryHandler, webhookHandler)
+		return runStatic(env, summaryHandler, webhookHandler, fraudCheckHandler)
 	case authModeSPIFFE:
-		return runSPIFFE(ctx, env, summaryHandler, webhookHandler)
+		return runSPIFFE(ctx, env, summaryHandler, webhookHandler, fraudCheckHandler)
 	default:
 		return fmt.Errorf("invalid AUTH_MODE: %s", env.AuthMode)
 	}
@@ -115,12 +121,13 @@ func run(ctx context.Context, env *Env) error {
 // on different routes with different auth middleware — sharing one address
 // means only one port to expose from AWS (one NodePort/tunnel entry),
 // instead of one per AWS-hosted caller.
-func runStatic(env *Env, summaryHandler, webhookHandler http.HandlerFunc) error {
+func runStatic(env *Env, summaryHandler, webhookHandler, fraudCheckHandler http.HandlerFunc) error {
 	clientMux := http.NewServeMux()
 	clientMux.HandleFunc("/api/summary", staticAuthMiddleware("bank-client", env.StaticClientAPIKey, summaryHandler))
 
 	externalMux := http.NewServeMux()
 	externalMux.HandleFunc("/webhook/transactions", staticAuthMiddleware("bank-lambda", env.StaticWebhookAPIKey, webhookHandler))
+	externalMux.HandleFunc("/api/fraud-check", staticAuthMiddleware("bank-fraud-checker", env.StaticFraudCheckAPIKey, fraudCheckHandler))
 
 	// bank-agent has its own separate deployment bootstrap (see
 	// workloads/bank/README.md) — don't register this route until it's
@@ -149,7 +156,7 @@ func runStatic(env *Env, summaryHandler, webhookHandler http.HandlerFunc) error 
 // obtain an X.509-SVID from, so their identity is presented as a bearer
 // token instead. They *can* share a listener with each other, though —
 // different routes, different auth middleware, one port to expose from AWS.
-func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler http.HandlerFunc) error {
+func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler, fraudCheckHandler http.HandlerFunc) error {
 	slog.Info("Waiting for X.509 SVID")
 	x509Source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
 	if err != nil {
@@ -172,9 +179,14 @@ func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler htt
 	if err != nil {
 		return fmt.Errorf("failed to parse LAMBDA_SPIFFE_ID: %w", err)
 	}
+	fraudCheckerSPIFFEID, err := spiffeid.FromString(env.FraudCheckerSPIFFEID)
+	if err != nil {
+		return fmt.Errorf("failed to parse FRAUD_CHECKER_SPIFFE_ID: %w", err)
+	}
 
 	externalMux := http.NewServeMux()
 	externalMux.HandleFunc("/webhook/transactions", jwtSVIDAuthMiddleware(wlClient, webhookAudience, lambdaSPIFFEID, webhookHandler))
+	externalMux.HandleFunc("/api/fraud-check", jwtSVIDAuthMiddleware(wlClient, fraudCheckAudience, fraudCheckerSPIFFEID, fraudCheckHandler))
 
 	clientMux := http.NewServeMux()
 	clientMux.HandleFunc("/api/summary", summaryHandler)
@@ -269,5 +281,35 @@ func handleWebhook(ledger *Ledger) http.HandlerFunc {
 		ledger.AddTransaction(txn)
 		slog.Info("Recorded transaction", "merchant", txn.Merchant, "amountPence", txn.AmountPence)
 		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// handleFraudCheck serves bank-fraud-checker's two-step poll: GET lists the
+// current transactions (so it can log what's outstanding before acting), POST
+// marks every currently-unchecked transaction as checked. Both live under one
+// route/one auth middleware instance, since it's the same caller either way —
+// bank-server has no separate "list-only" credential for this workload.
+// Callers don't select specific transactions to check — each POST simply
+// clears whatever's pending.
+func handleFraudCheck(ledger *Ledger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(ledger.Summary()); err != nil {
+				slog.Error("Error encoding summary", "error", err)
+			}
+		case http.MethodPost:
+			count := ledger.MarkFraudChecked(time.Now())
+			slog.Info("Marked transactions as fraud-checked", "count", count)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusAccepted)
+			if err := json.NewEncoder(w).Encode(map[string]int{"checked": count}); err != nil {
+				slog.Error("Error encoding fraud-check response", "error", err)
+			}
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	}
 }

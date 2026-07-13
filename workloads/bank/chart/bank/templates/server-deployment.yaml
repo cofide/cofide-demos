@@ -41,6 +41,8 @@ spec:
               value: {{ required "spiffe.clientSpiffeId is required when authMode=spiffe" .Values.spiffe.clientSpiffeId | quote }}
             - name: LAMBDA_SPIFFE_ID
               value: {{ required "spiffe.lambdaSpiffeId is required when authMode=spiffe" .Values.spiffe.lambdaSpiffeId | quote }}
+            - name: FRAUD_CHECKER_SPIFFE_ID
+              value: {{ required "spiffe.fraudCheckerSpiffeId is required when authMode=spiffe" .Values.spiffe.fraudCheckerSpiffeId | quote }}
             # Optional, no `required` guard: bank-agent has its own separate
             # deployment bootstrap (see the README), so bank-server must be
             # able to run in spiffe mode before it's configured — it just

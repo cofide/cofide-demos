@@ -28,6 +28,7 @@ CLIENT_SERVICE_TYPE="ClusterIP"
 CLIENT_API_KEY=""
 WEBHOOK_API_KEY=""
 AGENT_API_KEY=""
+FRAUD_CHECK_API_KEY=""
 AWS_REGION=""
 FUNCTION_NAME="cofide-bank-demo-lambda"
 WEBHOOK_URL=""
@@ -39,7 +40,7 @@ SKIP_KIND_LOAD=0
 usage() {
   cat <<EOF
 Usage: $(basename "$0") --kube-context <name> --client-api-key <key> --webhook-api-key <key> \\
-         --agent-api-key <key> --aws-region <region> [options]
+         --agent-api-key <key> --fraud-check-api-key <key> --aws-region <region> [options]
 
 bank-agent (the AWS Bedrock AgentCore chat agent) is a core part of this demo, not an optional add-on,
 but its container image has to exist in ECR before this script's Terraform apply can succeed — see the
@@ -55,6 +56,10 @@ Required:
   --client-api-key <key>       Bearer key bank-client presents to bank-server
   --webhook-api-key <key>      Bearer key bank-lambda presents to bank-server
   --agent-api-key <key>        Bearer key bank-agent presents to bank-server
+  --fraud-check-api-key <key>  Bearer key bank-fraud-checker presents to bank-server — this workload
+                                doesn't run in this cluster or this repo's Terraform at all (see the
+                                README); this key just needs to match whatever's configured on the VM
+                                that actually runs it
   --aws-region <region>        AWS region for the Lambda and bank-agent (skip with --skip-terraform)
 
 Options:
@@ -109,6 +114,7 @@ while [[ $# -gt 0 ]]; do
     --client-api-key) CLIENT_API_KEY="$2"; shift 2 ;;
     --webhook-api-key) WEBHOOK_API_KEY="$2"; shift 2 ;;
     --agent-api-key) AGENT_API_KEY="$2"; shift 2 ;;
+    --fraud-check-api-key) FRAUD_CHECK_API_KEY="$2"; shift 2 ;;
     --aws-region) AWS_REGION="$2"; shift 2 ;;
     --function-name) FUNCTION_NAME="$2"; shift 2 ;;
     --webhook-url) WEBHOOK_URL="$2"; shift 2 ;;
@@ -149,6 +155,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
   require client-api-key "$CLIENT_API_KEY"
   require webhook-api-key "$WEBHOOK_API_KEY"
   require agent-api-key "$AGENT_API_KEY"
+  require fraud-check-api-key "$FRAUD_CHECK_API_KEY"
 
   maybe_kind_load "$IMAGE_PREFIX" "$KIND_CLUSTER" "$SKIP_KIND_LOAD" \
     "${IMAGE_PREFIX}bank-server:${IMAGE_TAG}" "${IMAGE_PREFIX}bank-client:${IMAGE_TAG}"
@@ -176,6 +183,7 @@ if [[ "$SKIP_HELM" -eq 0 ]]; then
     --set staticAuth.clientApiKey="$CLIENT_API_KEY" \
     --set staticAuth.webhookApiKey="$WEBHOOK_API_KEY" \
     --set staticAuth.agentApiKey="$AGENT_API_KEY" \
+    --set staticAuth.fraudCheckApiKey="$FRAUD_CHECK_API_KEY" \
     --set oidc.discoveryUrl="$OIDC_DISCOVERY_URL" \
     --set oidc.clientId="$OIDC_CLIENT_ID" \
     --set oidc.redirectUrl="$OIDC_REDIRECT_URL"
