@@ -1,8 +1,20 @@
-# authMode toggles every hop in the demo between a pre-shared static secret
-# ("static", the world before Cofide Connect) and SPIFFE-issued identity
-# ("spiffe", after onboarding into Connect). Flipping it requires a
-# `helm upgrade` followed by a rollout restart, since the SPIFFE Workload API
-# socket is mounted at pod start.
+# authMode has two states:
+#   - "static": every route accepts only a pre-shared static secret, over
+#     plain HTTP — the world before Cofide Connect. Unchanged behaviour.
+#   - "mixed": both listeners always speak webPKI TLS (see the `tls` block
+#     below), and every route accepts EITHER a pre-shared static secret OR
+#     the equivalent SPIFFE-based credential (X.509-SVID mTLS for
+#     bank-client; a JWT-SVID for bank-lambda/bank-fraud-checker; a
+#     Credex-minted delegated JWT for bank-agent) — whichever the caller
+#     currently presents. "mixed" is a superset of the old "spiffe" mode: a
+#     route with no static key configured is effectively SPIFFE-only.
+# Once bank-server is running in "mixed" mode, individual callers
+# (bank-client, bank-lambda, bank-fraud-checker, bank-agent) can each switch
+# between presenting a static key or a SPIFFE credential independently, with
+# no further changes to bank-server or its Helm release. Flipping bank-server
+# itself between "static" and "mixed" still requires a `helm upgrade`
+# followed by a rollout restart, since the TLS cert volume and (if any SPIFFE
+# ID below is set) the SPIFFE Workload API socket are mounted at pod start.
 authMode: static
 
 image:
@@ -10,12 +22,15 @@ image:
   tag: latest
   pullPolicy: Never
 
-# Only used when authMode is "spiffe". serverSpiffeId/clientSpiffeId/
-# lambdaSpiffeId/fraudCheckerSpiffeId must match the SPIFFE IDs registered for
-# each workload in your trust domain — fraudCheckerSpiffeId's is registered
-# manually against a SPIRE server co-located with bank-fraud-checker on its
-# VM (see workloads/bank/README.md), the same "registration happens outside
-# this repo" pattern as the other three. agentAuthorizedActor is different:
+# Only used when authMode is "mixed", and only per-field: each of
+# clientSpiffeId/lambdaSpiffeId/fraudCheckerSpiffeId is independently
+# optional — set it once that caller has been migrated onto a SPIFFE
+# credential, leave it empty to keep accepting only that caller's static key.
+# Values must match the SPIFFE IDs registered for each workload in your trust
+# domain — fraudCheckerSpiffeId's is registered manually against a SPIRE
+# server co-located with bank-fraud-checker on its VM (see
+# workloads/bank/README.md), the same "registration happens outside this
+# repo" pattern as the other two. agentAuthorizedActor is different:
 # bank-agent (an AgentCore Runtime workload) has no SPIFFE identity at all —
 # it's the "sub" claim AWS puts in the identity JWT it presents to Credex
 # (i.e. bank-agent's IAM execution role ARN, see terraform output
@@ -23,13 +38,13 @@ image:
 # token's "act.sub" for bank-server to authorize.
 spiffe:
   socketPath: unix:///spiffe-workload-api/spire-agent.sock
-  serverSpiffeId: ""
   clientSpiffeId: ""
   lambdaSpiffeId: ""
   fraudCheckerSpiffeId: ""
   agentAuthorizedActor: ""
 
-# Only used when authMode is "static". Change these before deploying to a
+# Used whenever the corresponding key is non-empty, in BOTH "static" and
+# "mixed" modes — not just "static". Change these before deploying to a
 # shared cluster.
 staticAuth:
   clientApiKey: "changeme-client-key"
@@ -38,11 +53,30 @@ staticAuth:
   fraudCheckApiKey: "changeme-fraud-check-key"
 
 # Cofide Credex's OIDC discovery endpoint, used by bank-server to validate
-# bank-agent's delegated tokens. Only used when authMode is "spiffe" —
+# bank-agent's delegated tokens. Only used when authMode is "mixed" —
 # distinct from bank-agent's own Credex integration, which is configured in
 # workloads/bank/terraform/agentcore.tf, not here.
 credex:
   discoveryUrl: ""
+
+# The cert-manager-issued webPKI certificate bank-server presents on both
+# listeners in "mixed" mode. Assumes a ClusterIssuer/Issuer already exists in
+# the cluster (out of scope for this chart) — only referenced here by name.
+tls:
+  # Required when authMode is "mixed".
+  issuerName: ""
+  issuerKind: ClusterIssuer # or "Issuer" if issuerName is namespace-scoped
+  # Required when authMode is "mixed". Every hostname a caller will reach
+  # bank-server on over TLS must be listed here for hostname verification to
+  # succeed — both the in-cluster name bank-client uses for the client
+  # listener, and whichever public hostname/tunnel bank-lambda/
+  # bank-fraud-checker/bank-agent use for the webhook listener (see
+  # server.webhookServiceType and the README's tunnel setup).
+  dnsNames: []
+  duration: "2160h" # 90d
+  renewBefore: "360h" # 15d
+  certFile: /etc/bank-server/tls/tls.crt
+  keyFile: /etc/bank-server/tls/tls.key
 
 # OIDC sign-in, powering the dashboard's chat feature. Any OIDC-compliant
 # IdP works here (Ory, Auth0, Okta, ...) — nothing below is IdP-specific.

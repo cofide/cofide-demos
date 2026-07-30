@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"slices"
 	"sync"
@@ -128,13 +128,13 @@ type delegatedClaims struct {
 	Act *actorClaim `json:"act,omitempty"`
 }
 
-// delegatedJWTAuthMiddleware authorises requests bearing a Credex-minted,
-// delegated access token: bank-agent's on-behalf-of exchange (see
+// verifyDelegatedJWT is composeAuth's adapter for a Credex-minted, delegated
+// access token: bank-agent's on-behalf-of exchange (see
 // terraform/agentcore.tf) mints a token whose top-level "sub" is the
 // signed-in customer's identity from their IdP — not a SPIFFE ID — and
 // whose "act.sub" is bank-agent's own identity. That's why this can't reuse
-// jwtSVIDAuthMiddleware: the token isn't a JWT-SVID validated against the
-// local SPIFFE Workload API, it's an ordinary OAuth2 access token validated
+// verifyJWTSVID: the token isn't a JWT-SVID validated against the local
+// SPIFFE Workload API, it's an ordinary OAuth2 access token validated
 // against Credex's own published JWKS, the same way
 // workloads/ping-pong-exchange's relay mode validates delegated tokens.
 //
@@ -144,40 +144,38 @@ type delegatedClaims struct {
 // (terraform/agentcore.tf's M2M actorTokenContent) is the AWS IAM role ARN
 // of bank-agent's execution role, not a spiffe:// URI — Credex doesn't
 // normalize AWS-federated identities into SPIFFE IDs anywhere in this path.
-func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience string, authorizedActor string, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+//
+// Every failure past "no bearer token at all" is a real error, not
+// errNoCredential: a delegated JWT was clearly presented, just invalid,
+// which matters for composeAuth's Debug-vs-Warn logging split and for
+// correctly falling through to try a static key on the same Authorization
+// header if Credex validation fails structurally.
+func verifyDelegatedJWT(jwksFetcher *JWKSFetcher, expectedAudience string, authorizedActor string) authenticator {
+	return func(r *http.Request) (authOutcome, error) {
+		outcome := authOutcome{method: "delegated-jwt", caller: "bank-agent"}
+
 		token, ok := bearerToken(r)
 		if !ok {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "missing bearer token")
-			http.Error(w, "no token provided", http.StatusUnauthorized)
-			return
+			return outcome, errNoCredential
 		}
 
 		jwks, err := jwksFetcher.GetJWKS()
 		if err != nil {
-			slog.Error("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed to fetch Credex JWKS", "error", err)
-			http.Error(w, "unable to fetch JWKS", http.StatusServiceUnavailable)
-			return
+			return outcome, fmt.Errorf("failed to fetch Credex JWKS: %w", err)
 		}
 
 		tok, err := jwt.ParseSigned(token, allowedSignatureAlgs)
 		if err != nil {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed to parse token", "error", err)
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
+			return outcome, fmt.Errorf("failed to parse token: %w", err)
 		}
 
 		var claims delegatedClaims
 		if err := tok.Claims(jwks, &claims); err != nil {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed signature verification against Credex JWKS", "error", err)
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
+			return outcome, fmt.Errorf("failed signature verification against Credex JWKS: %w", err)
 		}
 
 		if err := claims.ValidateWithLeeway(jwt.Expected{Time: time.Now()}, 0); err != nil {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "failed time validation", "error", err)
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
+			return outcome, fmt.Errorf("failed time validation: %w", err)
 		}
 
 		// An empty audience is accepted, not just expectedAudience: AWS Bedrock
@@ -191,28 +189,22 @@ func delegatedJWTAuthMiddleware(jwksFetcher *JWKSFetcher, expectedAudience strin
 		// additionally constrains which audience a token must target when one
 		// is present.
 		if len(claims.Audience) > 0 && !slices.Contains([]string(claims.Audience), expectedAudience) {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "wrong audience", "audience", claims.Audience, "expected", expectedAudience)
-			http.Error(w, "invalid audience in token", http.StatusUnauthorized)
-			return
+			return outcome, fmt.Errorf("wrong audience %v, expected %s", claims.Audience, expectedAudience)
 		}
 
 		if claims.Act == nil || claims.Act.Sub == "" {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "missing act claim")
-			http.Error(w, "missing act claim", http.StatusUnauthorized)
-			return
+			return outcome, errors.New("missing act claim")
 		}
 		if claims.Act.Sub != authorizedActor {
-			slog.Warn("Rejected request", "auth_method", "delegated-jwt", "caller", "bank-agent", "reason", "unauthorized actor", "actor", claims.Act.Sub)
-			http.Error(w, "unauthorized actor", http.StatusForbidden)
-			return
+			return outcome, fmt.Errorf("unauthorized actor %s", claims.Act.Sub)
 		}
 
 		onBehalfOf := claims.Subject
 		if onBehalfOf == "" {
 			onBehalfOf = "unknown"
 		}
-		slog.Info("Authorised request", "auth_method", "delegated-jwt", "caller", "bank-agent", "on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub)
+		outcome.fields = []any{"on_behalf_of_verified", onBehalfOf, "actor", claims.Act.Sub}
 
-		next(w, r)
+		return outcome, nil
 	}
 }

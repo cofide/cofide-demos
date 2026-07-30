@@ -98,24 +98,32 @@ sequenceDiagram
 
 ### bank-server
 
-Listens on two ports: `CLIENT_API_ADDRESS` (default `:8443`) for `bank-client`, and `WEBHOOK_ADDRESS` (default `:8444`) — shared by `bank-lambda` and `bank-agent`, on different routes (`/webhook/transactions`, `/api/summary`) with different auth middleware. They share a listener because neither uses mTLS (both are already plain-HTTP bearer-token surfaces, unlike the client listener), and consolidating means only one port/NodePort/tunnel entry to expose from AWS, instead of one per AWS-hosted caller.
+Listens on two ports: `CLIENT_API_ADDRESS` (default `:8443`) for `bank-client`, and `WEBHOOK_ADDRESS` (default `:8444`) — shared by `bank-lambda` and `bank-agent`, on different routes (`/webhook/transactions`, `/api/summary`) with different auth middleware. They share a listener because neither uses mTLS (both are bearer-token surfaces, unlike the client listener), and consolidating means only one port/NodePort/tunnel entry to expose from AWS, instead of one per AWS-hosted caller.
 
-The agent-related variables below are optional even in their "if" mode — `bank-agent`'s Terraform can't be applied until `bank-server` is already running (see "bank-agent + OIDC bootstrap (one-time)" below), so `bank-server` must be able to start with the `/api/summary` route on this listener simply not registered during that brief bootstrap window, even though bank-agent is a permanent, non-optional part of the deployed demo.
+`AUTH_MODE` has two states:
+- `static`: both listeners serve plain HTTP, and every route accepts only a pre-shared static secret — the world before Cofide Connect.
+- `mixed`: both listeners always serve webPKI TLS (a cert-manager-issued certificate — see `TLS_CERT_FILE`/`TLS_KEY_FILE` below), and every route accepts EITHER a pre-shared static secret OR the equivalent SPIFFE-based credential — whichever the caller currently presents. This lets each caller (`bank-client`, `bank-lambda`, `bank-fraud-checker`, `bank-agent`) migrate onto a SPIFFE credential independently, on its own schedule, with no further changes to `bank-server` once it's running in `mixed` mode.
+
+Each caller's static key and SPIFFE ID (or Credex config, for `bank-agent`) below are independently optional in `mixed` mode — a route is SPIFFE-only if only the SPIFFE ID is set, static-only if only the static key is set, or dual-accepting if both are set. `bank-server` fails fast at startup if a mandatory route (`bank-client`/`bank-lambda`/`bank-fraud-checker`) has neither configured. The agent-related variables are optional even in `mixed` mode's dual-accepting sense — `bank-agent`'s Terraform can't be applied until `bank-server` is already running (see "bank-agent + OIDC bootstrap (one-time)" below), so `bank-server` must be able to start with the `/api/summary` route on this listener simply not registered during that brief bootstrap window, even though bank-agent is a permanent, non-optional part of the deployed demo.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `AUTH_MODE` | No | `static` | `static` or `spiffe` |
-| `STATIC_CLIENT_API_KEY` | If `static` | — | Bearer key expected from `bank-client` |
-| `STATIC_WEBHOOK_API_KEY` | If `static` | — | Bearer key expected from `bank-lambda` |
-| `STATIC_AGENT_API_KEY` | No | — | Bearer key expected from `bank-agent`; its route isn't registered if unset |
-| `STATIC_FRAUD_CHECK_API_KEY` | If `static` | — | Bearer key expected from `bank-fraud-checker` |
-| `CLIENT_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID for `bank-client` |
-| `LAMBDA_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-lambda` |
-| `FRAUD_CHECKER_SPIFFE_ID` | If `spiffe` | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-fraud-checker` |
-| `AGENT_AUTHORIZED_ACTOR` | No | — | Authorised actor (delegated token's `act.sub`) for `bank-agent` — not a SPIFFE ID, since `bank-agent` is an AgentCore Runtime workload with no SPIFFE identity; it's the AWS IAM execution role ARN that ends up there (see `terraform output bank_agent_execution_role_arn`). Its route isn't registered if unset |
-| `CREDEX_DISCOVERY_URL` | No | — | Credex OIDC discovery URL, used to fetch the JWKS that validates `bank-agent`'s delegated tokens; its route isn't registered if unset |
+| `AUTH_MODE` | No | `static` | `static` or `mixed` |
+| `TLS_CERT_FILE` | If `mixed` | `/etc/bank-server/tls/tls.crt` | Mounted webPKI certificate file (cert-manager managed) |
+| `TLS_KEY_FILE` | If `mixed` | `/etc/bank-server/tls/tls.key` | Mounted webPKI private key file |
+| `STATIC_CLIENT_API_KEY` | See above | — | Bearer key accepted from `bank-client` |
+| `STATIC_WEBHOOK_API_KEY` | See above | — | Bearer key accepted from `bank-lambda` |
+| `STATIC_AGENT_API_KEY` | No | — | Bearer key accepted from `bank-agent`; its route isn't registered if this and the two Credex variables below are all unset |
+| `STATIC_FRAUD_CHECK_API_KEY` | See above | — | Bearer key accepted from `bank-fraud-checker` |
+| `CLIENT_SPIFFE_ID` | See above | — | Authorised SPIFFE ID for `bank-client`'s X.509-SVID mTLS |
+| `LAMBDA_SPIFFE_ID` | See above | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-lambda` |
+| `FRAUD_CHECKER_SPIFFE_ID` | See above | — | Authorised SPIFFE ID (JWT-SVID subject) for `bank-fraud-checker` |
+| `AGENT_AUTHORIZED_ACTOR` | No | — | Authorised actor (delegated token's `act.sub`) for `bank-agent` — not a SPIFFE ID, since `bank-agent` is an AgentCore Runtime workload with no SPIFFE identity; it's the AWS IAM execution role ARN that ends up there (see `terraform output bank_agent_execution_role_arn`). Must be set together with `CREDEX_DISCOVERY_URL` |
+| `CREDEX_DISCOVERY_URL` | No | — | Credex OIDC discovery URL, used to fetch the JWKS that validates `bank-agent`'s delegated tokens. Must be set together with `AGENT_AUTHORIZED_ACTOR` |
 | `AGENT_TOKEN_AUDIENCE` | No | `bank-server-agent-api` | Expected `aud` claim on `bank-agent`'s delegated tokens |
-| `SPIFFE_ENDPOINT_SOCKET` | No | `unix:///spiffe-workload-api/spire-agent.sock` | SPIFFE Workload API socket path |
+| `SPIFFE_ENDPOINT_SOCKET` | No | `unix:///spiffe-workload-api/spire-agent.sock` | SPIFFE Workload API socket path — only connected to if at least one SPIFFE ID above is set |
+
+> **Note:** the rest of this document (the sections below, `scripts/toggle-spiffe.sh`, and the Terraform `auth_mode` variable) still describes the older, all-or-nothing `static`/`spiffe` toggle applied to every component at once. Only `bank-server` itself has been updated to the dual-accepting `mixed` model above; `bank-client`/`bank-lambda`/`bank-agent`/`bank-fraud-checker` and their deployment tooling haven't been migrated onto independent per-component toggles yet.
 
 ### bank-client
 

@@ -34,39 +34,55 @@ spec:
             # Shared by bank-lambda and bank-agent — see values.yaml.
             - name: WEBHOOK_ADDRESS
               value: ":{{ .Values.server.webhookPort }}"
-            {{- if eq .Values.authMode "spiffe" }}
+            {{- if eq .Values.authMode "mixed" }}
+            - name: TLS_CERT_FILE
+              value: {{ .Values.tls.certFile | quote }}
+            - name: TLS_KEY_FILE
+              value: {{ .Values.tls.keyFile | quote }}
+            # Each SPIFFE ID below is independently optional in mixed mode —
+            # bank-server's Go code requires at least one of {this SPIFFE ID,
+            # the matching static key in bank-server-auth} per mandatory
+            # route, not both, and fails fast at startup if neither is set.
             - name: SPIFFE_ENDPOINT_SOCKET
               value: {{ .Values.spiffe.socketPath | quote }}
             - name: CLIENT_SPIFFE_ID
-              value: {{ required "spiffe.clientSpiffeId is required when authMode=spiffe" .Values.spiffe.clientSpiffeId | quote }}
+              value: {{ .Values.spiffe.clientSpiffeId | quote }}
             - name: LAMBDA_SPIFFE_ID
-              value: {{ required "spiffe.lambdaSpiffeId is required when authMode=spiffe" .Values.spiffe.lambdaSpiffeId | quote }}
+              value: {{ .Values.spiffe.lambdaSpiffeId | quote }}
             - name: FRAUD_CHECKER_SPIFFE_ID
-              value: {{ required "spiffe.fraudCheckerSpiffeId is required when authMode=spiffe" .Values.spiffe.fraudCheckerSpiffeId | quote }}
+              value: {{ .Values.spiffe.fraudCheckerSpiffeId | quote }}
             # Optional, no `required` guard: bank-agent has its own separate
             # deployment bootstrap (see the README), so bank-server must be
-            # able to run in spiffe mode before it's configured — it just
+            # able to run in mixed mode before it's configured — it just
             # disables the agent-facing listener until both are set.
             - name: AGENT_AUTHORIZED_ACTOR
               value: {{ .Values.spiffe.agentAuthorizedActor | quote }}
             - name: CREDEX_DISCOVERY_URL
               value: {{ .Values.credex.discoveryUrl | quote }}
             {{- end }}
-          {{- if eq .Values.authMode "static" }}
           envFrom:
             - secretRef:
                 name: bank-server-auth
-          {{- end }}
-          {{- if eq .Values.authMode "spiffe" }}
+          {{- if eq .Values.authMode "mixed" }}
           volumeMounts:
+            - name: bank-server-tls
+              mountPath: /etc/bank-server/tls
+              readOnly: true
+            {{- if or .Values.spiffe.clientSpiffeId .Values.spiffe.lambdaSpiffeId .Values.spiffe.fraudCheckerSpiffeId }}
             - name: spiffe-workload-api
               mountPath: /spiffe-workload-api
               readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if eq .Values.authMode "spiffe" }}
+      {{- if eq .Values.authMode "mixed" }}
       volumes:
+        - name: bank-server-tls
+          secret:
+            secretName: bank-server-tls
+        {{- if or .Values.spiffe.clientSpiffeId .Values.spiffe.lambdaSpiffeId .Values.spiffe.fraudCheckerSpiffeId }}
         - name: spiffe-workload-api
           csi:
             driver: "csi.spiffe.io"
             readOnly: true
+        {{- end }}
       {{- end }}

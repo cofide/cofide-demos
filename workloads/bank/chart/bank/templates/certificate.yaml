@@ -1,0 +1,17 @@
+{{- if eq .Values.authMode "mixed" }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: bank-server-tls
+  labels:
+    {{- include "bank.labels" . | nindent 4 }}
+spec:
+  secretName: bank-server-tls
+  dnsNames:
+    {{- toYaml (required "tls.dnsNames is required when authMode=mixed" .Values.tls.dnsNames) | nindent 4 }}
+  issuerRef:
+    name: {{ required "tls.issuerName is required when authMode=mixed" .Values.tls.issuerName | quote }}
+    kind: {{ .Values.tls.issuerKind | default "ClusterIssuer" | quote }}
+  duration: {{ .Values.tls.duration | default "2160h" | quote }}
+  renewBefore: {{ .Values.tls.renewBefore | default "360h" | quote }}
+{{- end }}

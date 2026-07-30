@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -16,10 +19,23 @@ import (
 
 const (
 	authModeStatic = "static"
-	authModeSPIFFE = "spiffe"
+	// authModeMixed serves both listeners over webPKI TLS and, on every
+	// route, accepts either a pre-shared static API key or the equivalent
+	// SPIFFE-based credential — whichever the caller currently presents.
+	// This supersedes the old SPIFFE-only mode: once a bank-server
+	// deployment is in mixed mode, individual callers can switch between
+	// static and SPIFFE independently, with no further bank-server restart.
+	authModeMixed = "mixed"
 
 	webhookAudience    = "bank-server-webhook"
 	fraudCheckAudience = "bank-server-fraud-check"
+
+	// tlsReloadInterval controls how often the mixed-mode TLS certificate is
+	// re-read from disk, so cert-manager's periodic rotation (which replaces
+	// the mounted Secret's files via an atomic symlink swap) is picked up
+	// without a pod restart. Polling, not fsnotify: a watch on the leaf file
+	// itself is silently invalidated the moment the swap happens.
+	tlsReloadInterval = 60 * time.Second
 )
 
 func main() {
@@ -30,20 +46,36 @@ func main() {
 }
 
 type Env struct {
-	AuthMode               string
-	ClientAPIAddress       string
-	WebhookAddress         string
-	SpiffeSocketPath       string
+	AuthMode         string
+	ClientAPIAddress string
+	WebhookAddress   string
+
+	// Mixed mode only, both required.
+	TLSCertFile string
+	TLSKeyFile  string
+
+	// Mixed mode only; only connected to if at least one of
+	// ClientSPIFFEID/LambdaSPIFFEID/FraudCheckerSPIFFEID below is set.
+	SpiffeSocketPath string
+
+	// Each pair below is "at least one of the two must be set" for these
+	// three mandatory routes in mixed mode (enforced in getEnv via
+	// requireOneOf) — plain optional strings, empty means "this mechanism
+	// disabled for this route", not gated by AuthMode beyond that.
 	ClientSPIFFEID         string
-	LambdaSPIFFEID         string
-	FraudCheckerSPIFFEID   string
-	AgentAuthorizedActor   string
 	StaticClientAPIKey     string
+	LambdaSPIFFEID         string
 	StaticWebhookAPIKey    string
+	FraudCheckerSPIFFEID   string
 	StaticFraudCheckAPIKey string
-	StaticAgentAPIKey      string
-	CredexDiscoveryURL     string
-	AgentTokenAudience     string
+
+	// bank-agent route: fully optional, as today — registered iff at least
+	// one of {StaticAgentAPIKey, (AgentAuthorizedActor && CredexDiscoveryURL)}
+	// is configured.
+	StaticAgentAPIKey    string
+	AgentAuthorizedActor string
+	CredexDiscoveryURL   string
+	AgentTokenAudience   string
 }
 
 func mustGetEnv(variable string) string {
@@ -70,7 +102,6 @@ func getEnv() *Env {
 		AuthMode:         authMode,
 		ClientAPIAddress: getEnvWithDefault("CLIENT_API_ADDRESS", ":8443"),
 		WebhookAddress:   getEnvWithDefault("WEBHOOK_ADDRESS", ":8444"),
-		SpiffeSocketPath: getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock"),
 	}
 
 	switch authMode {
@@ -82,19 +113,54 @@ func getEnv() *Env {
 		// deployment bootstrap (see workloads/bank/README.md), so
 		// bank-server must be able to start without it configured yet.
 		env.StaticAgentAPIKey = getEnvWithDefault("STATIC_AGENT_API_KEY", "")
-	case authModeSPIFFE:
-		env.ClientSPIFFEID = mustGetEnv("CLIENT_SPIFFE_ID")
-		env.LambdaSPIFFEID = mustGetEnv("LAMBDA_SPIFFE_ID")
-		env.FraudCheckerSPIFFEID = mustGetEnv("FRAUD_CHECKER_SPIFFE_ID")
+	case authModeMixed:
+		env.TLSCertFile = getEnvWithDefault("TLS_CERT_FILE", "/etc/bank-server/tls/tls.crt")
+		env.TLSKeyFile = getEnvWithDefault("TLS_KEY_FILE", "/etc/bank-server/tls/tls.key")
+
+		env.ClientSPIFFEID = getEnvWithDefault("CLIENT_SPIFFE_ID", "")
+		env.StaticClientAPIKey = getEnvWithDefault("STATIC_CLIENT_API_KEY", "")
+		requireOneOf("bank-client", env.ClientSPIFFEID, env.StaticClientAPIKey)
+
+		env.LambdaSPIFFEID = getEnvWithDefault("LAMBDA_SPIFFE_ID", "")
+		env.StaticWebhookAPIKey = getEnvWithDefault("STATIC_WEBHOOK_API_KEY", "")
+		requireOneOf("bank-lambda", env.LambdaSPIFFEID, env.StaticWebhookAPIKey)
+
+		env.FraudCheckerSPIFFEID = getEnvWithDefault("FRAUD_CHECKER_SPIFFE_ID", "")
+		env.StaticFraudCheckAPIKey = getEnvWithDefault("STATIC_FRAUD_CHECK_API_KEY", "")
+		requireOneOf("bank-fraud-checker", env.FraudCheckerSPIFFEID, env.StaticFraudCheckAPIKey)
+
+		// Optional: bank-agent has its own separate deployment bootstrap (see
+		// workloads/bank/README.md), so bank-server must be able to start
+		// before either its static key or its Credex delegated-JWT config is
+		// set — it just disables the agent-facing route until at least one is.
+		env.StaticAgentAPIKey = getEnvWithDefault("STATIC_AGENT_API_KEY", "")
 		env.AgentAuthorizedActor = getEnvWithDefault("AGENT_AUTHORIZED_ACTOR", "")
 		env.CredexDiscoveryURL = getEnvWithDefault("CREDEX_DISCOVERY_URL", "")
 		env.AgentTokenAudience = getEnvWithDefault("AGENT_TOKEN_AUDIENCE", "bank-server-agent-api")
+		if (env.AgentAuthorizedActor == "") != (env.CredexDiscoveryURL == "") {
+			slog.Error("AGENT_AUTHORIZED_ACTOR and CREDEX_DISCOVERY_URL must be set together")
+			os.Exit(1)
+		}
+
+		if env.ClientSPIFFEID != "" || env.LambdaSPIFFEID != "" || env.FraudCheckerSPIFFEID != "" {
+			env.SpiffeSocketPath = getEnvWithDefault("SPIFFE_ENDPOINT_SOCKET", "unix:///spiffe-workload-api/spire-agent.sock")
+		}
 	default:
 		slog.Error("Invalid AUTH_MODE", "value", authMode)
 		os.Exit(1)
 	}
 
 	return env
+}
+
+// requireOneOf fails startup if neither a SPIFFE ID nor a static API key is
+// configured for a mandatory route — in mixed mode, a route must have at
+// least one working authentication mechanism.
+func requireOneOf(route, spiffeID, staticKey string) {
+	if spiffeID == "" && staticKey == "" {
+		slog.Error("Route has no configured authentication mechanism", "route", route)
+		os.Exit(1)
+	}
 }
 
 func run(ctx context.Context, env *Env) error {
@@ -107,8 +173,8 @@ func run(ctx context.Context, env *Env) error {
 	switch env.AuthMode {
 	case authModeStatic:
 		return runStatic(env, summaryHandler, webhookHandler, fraudCheckHandler)
-	case authModeSPIFFE:
-		return runSPIFFE(ctx, env, summaryHandler, webhookHandler, fraudCheckHandler)
+	case authModeMixed:
+		return runMixed(ctx, env, summaryHandler, webhookHandler, fraudCheckHandler)
 	default:
 		return fmt.Errorf("invalid AUTH_MODE: %s", env.AuthMode)
 	}
@@ -146,57 +212,142 @@ func runStatic(env *Env, summaryHandler, webhookHandler, fraudCheckHandler http.
 	return runListeners(listeners)
 }
 
-// runSPIFFE serves the client-facing summary API over SPIFFE X.509-SVID
-// mTLS, and the Lambda-facing webhook and agent-facing summary API — both
-// plain HTTP, authorised by a self-verifying bearer JWT (a SPIFFE JWT-SVID
-// for the Lambda, a Credex-minted delegated token for the agent), so
-// neither requires TLS termination — on a single shared external listener.
-// Neither can share the client listener's mTLS: bank-lambda and bank-agent
-// (an AgentCore Runtime workload) have no SPIFFE Workload API socket to
-// obtain an X.509-SVID from, so their identity is presented as a bearer
-// token instead. They *can* share a listener with each other, though —
-// different routes, different auth middleware, one port to expose from AWS.
-func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler, fraudCheckHandler http.HandlerFunc) error {
-	slog.Info("Waiting for X.509 SVID")
-	x509Source, err := workloadapi.NewX509Source(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
-	if err != nil {
-		return fmt.Errorf("unable to obtain X.509 SVID: %w", err)
-	}
-	defer func() { _ = x509Source.Close() }()
-	slog.Info("Retrieved X.509 SVID")
+// mixedDeps bundles runMixed's external dependencies so buildMuxes can be
+// tested without a real Workload API socket or real mounted cert files.
+type mixedDeps struct {
+	bundleSource   x509bundle.Source
+	wlClient       *workloadapi.Client
+	getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+}
 
-	wlClient, err := workloadapi.New(ctx, workloadapi.WithAddr(env.SpiffeSocketPath))
+// runMixed serves both listeners over webPKI TLS (a cert-manager-issued
+// certificate, reloaded periodically from disk — see certReloader) and, on
+// every route, accepts either a pre-shared static API key or the caller's
+// SPIFFE-based credential (X.509-SVID mTLS for bank-client; a JWT-SVID for
+// bank-lambda/bank-fraud-checker; a Credex-minted delegated JWT for
+// bank-agent) — whichever it currently presents. Once a bank-server
+// deployment is running this mode, individual callers can switch between
+// static and SPIFFE independently, with no further bank-server restart.
+func runMixed(ctx context.Context, env *Env, summaryHandler, webhookHandler, fraudCheckHandler http.HandlerFunc) error {
+	certReloader, err := newCertReloader(env.TLSCertFile, env.TLSKeyFile)
 	if err != nil {
-		return fmt.Errorf("failed to create workload client: %w", err)
+		return fmt.Errorf("failed to load TLS certificate: %w", err)
 	}
-	defer func() { _ = wlClient.Close() }()
+	go certReloader.watch(ctx, tlsReloadInterval)
 
-	clientSPIFFEID, err := spiffeid.FromString(env.ClientSPIFFEID)
-	if err != nil {
-		return fmt.Errorf("failed to parse CLIENT_SPIFFE_ID: %w", err)
-	}
-	lambdaSPIFFEID, err := spiffeid.FromString(env.LambdaSPIFFEID)
-	if err != nil {
-		return fmt.Errorf("failed to parse LAMBDA_SPIFFE_ID: %w", err)
-	}
-	fraudCheckerSPIFFEID, err := spiffeid.FromString(env.FraudCheckerSPIFFEID)
-	if err != nil {
-		return fmt.Errorf("failed to parse FRAUD_CHECKER_SPIFFE_ID: %w", err)
+	deps := mixedDeps{getCertificate: certReloader.GetCertificate}
+
+	// The trust bundle and workload API client are only needed if at least
+	// one caller is currently using a SPIFFE-based credential — a
+	// mixed-mode deployment where every caller still presents a static key
+	// has no need to talk to the Workload API at all.
+	if env.ClientSPIFFEID != "" || env.LambdaSPIFFEID != "" || env.FraudCheckerSPIFFEID != "" {
+		bundleSource, err := workloadapi.NewBundleSource(ctx, workloadapi.WithClientOptions(workloadapi.WithAddr(env.SpiffeSocketPath)))
+		if err != nil {
+			return fmt.Errorf("unable to obtain SPIFFE trust bundle: %w", err)
+		}
+		defer func() { _ = bundleSource.Close() }()
+		deps.bundleSource = bundleSource
+
+		wlClient, err := workloadapi.New(ctx, workloadapi.WithAddr(env.SpiffeSocketPath))
+		if err != nil {
+			return fmt.Errorf("failed to create workload client: %w", err)
+		}
+		defer func() { _ = wlClient.Close() }()
+		deps.wlClient = wlClient
 	}
 
-	externalMux := http.NewServeMux()
-	externalMux.HandleFunc("/webhook/transactions", jwtSVIDAuthMiddleware(wlClient, webhookAudience, lambdaSPIFFEID, webhookHandler))
-	externalMux.HandleFunc("/api/fraud-check", jwtSVIDAuthMiddleware(wlClient, fraudCheckAudience, fraudCheckerSPIFFEID, fraudCheckHandler))
+	clientMux, webhookMux, clientTLSConfig, webhookTLSConfig, err := buildMuxes(env, deps, summaryHandler, webhookHandler, fraudCheckHandler)
+	if err != nil {
+		return err
+	}
 
-	clientMux := http.NewServeMux()
-	clientMux.HandleFunc("/api/summary", summaryHandler)
-	tlsConfig := tlsconfig.MTLSServerConfig(x509Source, x509Source, loggingAuthorizer("bank-client", tlsconfig.AuthorizeOneOf(clientSPIFFEID)))
 	clientServer := httpServer(env.ClientAPIAddress, clientMux)
-	clientServer.TLSConfig = tlsConfig
+	clientServer.TLSConfig = clientTLSConfig
+	webhookServer := httpServer(env.WebhookAddress, webhookMux)
+	webhookServer.TLSConfig = webhookTLSConfig
 
-	// bank-agent has its own separate deployment bootstrap (see
-	// workloads/bank/README.md) — don't register this route, or discover
-	// Credex's JWKS endpoint, until it's configured.
+	listeners := []namedServer{
+		{"Client API server (TLS, static key and/or mTLS)", env.ClientAPIAddress, func() error { return clientServer.ListenAndServeTLS("", "") }},
+		{"External API server (TLS, static key and/or JWT-SVID/delegated JWT)", env.WebhookAddress, func() error { return webhookServer.ListenAndServeTLS("", "") }},
+	}
+	return runListeners(listeners)
+}
+
+// buildMuxes wires up every route's authenticator(s) and both listeners'
+// TLS configs from env and deps. Split out from runMixed as a pure,
+// side-effect-free (beyond one Credex JWKS discovery HTTP call) function so
+// tests can exercise it with fake deps instead of a real Workload API
+// socket or mounted cert files.
+func buildMuxes(env *Env, deps mixedDeps, summaryHandler, webhookHandler, fraudCheckHandler http.HandlerFunc) (clientMux, webhookMux *http.ServeMux, clientTLSConfig, webhookTLSConfig *tls.Config, err error) {
+	// --- client listener: static key OR mTLS ---
+	var clientAuthenticators []authenticator
+	if env.StaticClientAPIKey != "" {
+		clientAuthenticators = append(clientAuthenticators, verifyStaticKey("bank-client", env.StaticClientAPIKey))
+	}
+	clientTLSConfig = &tls.Config{
+		MinVersion:     tls.VersionTLS12,
+		GetCertificate: deps.getCertificate,
+	}
+	if env.ClientSPIFFEID != "" {
+		clientSPIFFEID, parseErr := spiffeid.FromString(env.ClientSPIFFEID)
+		if parseErr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to parse CLIENT_SPIFFE_ID: %w", parseErr)
+		}
+		clientAuthenticators = append(clientAuthenticators, verifyMTLS("bank-client"))
+
+		bundleSource := deps.bundleSource
+		authorizer := loggingAuthorizer("bank-client", tlsconfig.AuthorizeOneOf(clientSPIFFEID))
+		// Request, don't require, a client certificate: an unset cert
+		// (rawCerts empty) is accepted here so composeAuth can still fall
+		// through to a static key for callers not yet using mTLS; a
+		// presented cert is fully verified against the SPIFFE trust bundle
+		// and rejected at the handshake if it doesn't check out.
+		clientTLSConfig.ClientAuth = tls.RequestClientCert
+		clientTLSConfig.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+			if len(rawCerts) == 0 {
+				return nil
+			}
+			return tlsconfig.VerifyPeerCertificate(bundleSource, authorizer)(rawCerts, nil)
+		}
+	}
+	clientMux = http.NewServeMux()
+	clientMux.HandleFunc("/api/summary", composeAuth("bank-client", clientAuthenticators, summaryHandler))
+
+	// --- webhook listener: static key OR jwt-svid, per route ---
+	webhookMux = http.NewServeMux()
+
+	var lambdaAuthenticators []authenticator
+	if env.StaticWebhookAPIKey != "" {
+		lambdaAuthenticators = append(lambdaAuthenticators, verifyStaticKey("bank-lambda", env.StaticWebhookAPIKey))
+	}
+	if env.LambdaSPIFFEID != "" {
+		lambdaSPIFFEID, parseErr := spiffeid.FromString(env.LambdaSPIFFEID)
+		if parseErr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to parse LAMBDA_SPIFFE_ID: %w", parseErr)
+		}
+		lambdaAuthenticators = append(lambdaAuthenticators, verifyJWTSVID(deps.wlClient, "bank-lambda", webhookAudience, lambdaSPIFFEID))
+	}
+	webhookMux.HandleFunc("/webhook/transactions", composeAuth("bank-lambda", lambdaAuthenticators, webhookHandler))
+
+	var fraudCheckAuthenticators []authenticator
+	if env.StaticFraudCheckAPIKey != "" {
+		fraudCheckAuthenticators = append(fraudCheckAuthenticators, verifyStaticKey("bank-fraud-checker", env.StaticFraudCheckAPIKey))
+	}
+	if env.FraudCheckerSPIFFEID != "" {
+		fraudCheckerSPIFFEID, parseErr := spiffeid.FromString(env.FraudCheckerSPIFFEID)
+		if parseErr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to parse FRAUD_CHECKER_SPIFFE_ID: %w", parseErr)
+		}
+		fraudCheckAuthenticators = append(fraudCheckAuthenticators, verifyJWTSVID(deps.wlClient, "bank-fraud-checker", fraudCheckAudience, fraudCheckerSPIFFEID))
+	}
+	webhookMux.HandleFunc("/api/fraud-check", composeAuth("bank-fraud-checker", fraudCheckAuthenticators, fraudCheckHandler))
+
+	// --- bank-agent route: fully optional, static key OR delegated JWT ---
+	var agentAuthenticators []authenticator
+	if env.StaticAgentAPIKey != "" {
+		agentAuthenticators = append(agentAuthenticators, verifyStaticAgentKey(env.StaticAgentAPIKey))
+	}
 	if env.AgentAuthorizedActor != "" && env.CredexDiscoveryURL != "" {
 		// Custom User-Agent: Credex's OIDC discovery/JWKS endpoints in this
 		// demo are fronted by a Cloudflare tunnel, which blocks Go's default
@@ -204,23 +355,21 @@ func runSPIFFE(ctx context.Context, env *Env, summaryHandler, webhookHandler, fr
 		// same issue already hit and fixed for bank-lambda's Python client.
 		httpClient := &http.Client{Timeout: 10 * time.Second, Transport: &userAgentTransport{userAgent: "cofide-bank-server/1.0"}}
 		slog.Info("Discovering Credex JWKS endpoint", "issuer", env.CredexDiscoveryURL)
-		jwksURI, err := discoverJWKSURI(env.CredexDiscoveryURL, httpClient)
-		if err != nil {
-			return fmt.Errorf("failed to discover Credex JWKS endpoint: %w", err)
+		jwksURI, discErr := discoverJWKSURI(env.CredexDiscoveryURL, httpClient)
+		if discErr != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to discover Credex JWKS endpoint: %w", discErr)
 		}
-		jwksFetcher := &JWKSFetcher{url: jwksURI, client: httpClient}
-
-		externalMux.HandleFunc("/api/summary", delegatedJWTAuthMiddleware(jwksFetcher, env.AgentTokenAudience, env.AgentAuthorizedActor, summaryHandler))
+		agentAuthenticators = append(agentAuthenticators, verifyDelegatedJWT(&JWKSFetcher{url: jwksURI, client: httpClient}, env.AgentTokenAudience, env.AgentAuthorizedActor))
+	}
+	if len(agentAuthenticators) > 0 {
+		webhookMux.HandleFunc("/api/summary", composeAuth("bank-agent", agentAuthenticators, summaryHandler))
 	} else {
-		slog.Info("AGENT_AUTHORIZED_ACTOR/CREDEX_DISCOVERY_URL not set — bank-agent's API is disabled")
+		slog.Info("No bank-agent credentials configured — bank-agent's API is disabled")
 	}
 
-	listeners := []namedServer{
-		{"External API server (JWT-SVID / delegated JWT)", env.WebhookAddress, httpServer(env.WebhookAddress, externalMux).ListenAndServe},
-		{"Client API server (mTLS)", env.ClientAPIAddress, func() error { return clientServer.ListenAndServeTLS("", "") }},
-	}
+	webhookTLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: deps.getCertificate}
 
-	return runListeners(listeners)
+	return clientMux, webhookMux, clientTLSConfig, webhookTLSConfig, nil
 }
 
 // namedServer pairs a human-readable label and address (for logging) with
