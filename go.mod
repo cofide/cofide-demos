@@ -1,6 +1,6 @@
 module github.com/cofide/cofide-demos
 
-go 1.25.8
+go 1.26.8
 
 // Uncomment the following for development with local Cofide SDK changes:
 // replace github.com/cofide/cofide-sdk-go => ../cofide-sdk-go
