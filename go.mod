@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.48.0
 	github.com/cofide/cofide-sdk-go v0.4.2
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spiffe/go-spiffe/v2 v2.8.1
 	golang.org/x/oauth2 v0.36.0
