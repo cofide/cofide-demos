@@ -17,7 +17,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.5
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spiffe/go-spiffe/v2 v2.8.1
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.297.0
 )
 
