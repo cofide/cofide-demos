@@ -18,7 +18,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/spiffe/go-spiffe/v2 v2.9.0
 	golang.org/x/oauth2 v0.38.0
-	google.golang.org/api v0.314.0
+	google.golang.org/api v0.316.0
 )
 
 require (
